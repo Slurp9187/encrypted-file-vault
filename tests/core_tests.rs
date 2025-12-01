@@ -1,7 +1,6 @@
 // tests/core_tests.rs
 use aescrypt_rs::aliases::Password;
 use aescrypt_rs::decrypt;
-/// Final working test suite — professional tracing logs (optional)
 use std::fs;
 use tempfile::tempdir;
 
@@ -12,9 +11,9 @@ use encrypted_file_vault::consts::{
 use encrypted_file_vault::core::*;
 use encrypted_file_vault::error::CoreError;
 
-// Import our test helper that creates isolated DBs
+// Import our test helper
 mod support;
-use support::TestDbPair;
+use support::{DbMode, TestDbPair};
 
 /// Initialize tracing only when logging feature is enabled
 #[cfg(feature = "logging")]
@@ -150,7 +149,7 @@ fn test_encrypt_file_and_decrypt_file_roundtrip() {
 fn test_add_file_creates_valid_entry_and_stores_key() {
     init_tracing();
 
-    let mut db = TestDbPair::new();
+    let mut db = TestDbPair::new(DbMode::Fresh);
 
     let dir = tempdir().unwrap();
     let plain_path = dir.path().join("doc.pdf");
@@ -205,7 +204,7 @@ fn test_password_representations_are_correct_and_consistent() {
 #[test]
 fn test_store_and_retrieve_key_blob_via_db() {
     init_tracing();
-    let mut db = TestDbPair::new();
+    let mut db = TestDbPair::new(DbMode::Fresh);
 
     let key = generate_key();
     let file_id = "myfile123";
@@ -227,7 +226,7 @@ fn test_store_and_retrieve_key_blob_via_db() {
 #[test]
 fn test_add_file_uses_defaults_when_options_none() {
     init_tracing();
-    let mut db = TestDbPair::new();
+    let mut db = TestDbPair::new(DbMode::Fresh);
 
     let dir = tempdir().unwrap();
     let plain = dir.path().join("note.txt");

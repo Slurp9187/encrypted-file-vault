@@ -10,14 +10,15 @@ use tempfile::tempdir;
 
 // Shared test helper — fresh DBs every test
 mod support;
-use support::TestDbPair;
+use support::{DbMode, TestDbPair};
 
 // Use the REAL std::result::Result (two generics) for test functions
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 #[test]
 fn test_store_key_blob_populates_history() {
-    let mut db = TestDbPair::new();
+    // Explicitly use Fresh mode — these are unit-style tests
+    let mut db = TestDbPair::new(DbMode::Fresh);
 
     let key = generate_key();
     let file_id = "testfile1";
@@ -53,7 +54,8 @@ fn test_store_key_blob_populates_history() {
     let new_key = generate_key();
     store_key_blob(&mut db.vault, file_id, &new_key).unwrap();
 
-    let (version, note, superseded_at): (i64, String, Option<String>) = db.vault
+    let (version, note, superseded_at): (i64, String, Option<String>) = db
+        .vault
         .query_row(
             "SELECT version, note, superseded_at FROM key_history WHERE file_id = ?1 AND version = 2",
             [file_id],
@@ -68,7 +70,7 @@ fn test_store_key_blob_populates_history() {
 
 #[test]
 fn test_rotate_key_in_vault_updates_history() -> TestResult {
-    let mut db = TestDbPair::new();
+    let mut db = TestDbPair::new(DbMode::Fresh);
 
     let dir = tempdir()?;
     let plain_path = dir.path().join("test.txt");
@@ -128,7 +130,7 @@ fn test_rotate_key_in_vault_updates_history() -> TestResult {
 
 #[test]
 fn test_history_backfill_on_existing_keys() -> TestResult {
-    let db = TestDbPair::new();
+    let db = TestDbPair::new(DbMode::Fresh);
 
     // Insert directly into `keys` (simulate legacy data)
     {
