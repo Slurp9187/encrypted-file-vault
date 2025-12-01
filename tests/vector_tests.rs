@@ -2,11 +2,12 @@
 mod common;
 use common::{DbMode, TestDbPair};
 
-use aescrypt_rs::aliases::Password;
+// use aescrypt_rs::aliases::Password as AesCryptPassword; // only allowed here for legacy vectors
 use aescrypt_rs::convert::convert_to_v3;
 use aescrypt_rs::{decrypt, encrypt};
 use blake3::Hasher;
 use chrono::Utc;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -72,7 +73,7 @@ fn _run_vector_test(mode: DbMode) {
     #[cfg(feature = "logging")]
     info!("Starting vector test — mode: {mode:?}");
 
-    let mut db = TestDbPair::new(mode); // mutable!
+    let mut db = TestDbPair::new(mode);
 
     let output_dir = db.path().join("output");
     let _ = fs::remove_dir_all(&output_dir);
@@ -87,7 +88,7 @@ fn _run_vector_test(mode: DbMode) {
     ];
 
     let mut log_entries = Vec::new();
-    let password = "Hello".to_owned();
+    let legacy_password_str = "Hello".to_owned();
     let iterations = 5;
 
     for (version, path) in versions {
@@ -97,36 +98,43 @@ fn _run_vector_test(mode: DbMode) {
         for (idx, vec) in vectors.iter().enumerate() {
             let ciphertext = hex::decode(&vec.ciphertext_hex).unwrap();
 
+            // Legacy → v3 upgrade path
             let v3_data = if version != "v3" {
                 let buffer = Arc::new(Mutex::new(Vec::new()));
                 {
                     let writer = ThreadSafeVec(buffer.clone());
+                    let legacy_password = FilePassword::new(legacy_password_str.clone());
                     convert_to_v3(
                         Cursor::new(&ciphertext),
                         writer,
-                        &Password::new(password.clone()),
+                        &legacy_password,
                         iterations,
                     )
-                    .expect("convert_to_v3");
+                    .expect("convert_to_v3 failed");
                 }
-                Arc::try_unwrap(buffer).unwrap().into_inner().unwrap()
+                Arc::try_unwrap(buffer)
+                    .expect("buffer still has references")
+                    .into_inner()
+                    .expect("mutex poisoned")
             } else {
                 ciphertext
             };
 
             assert_eq!(&v3_data[0..5], b"AES\x03\x00");
 
+            // Verify we can decrypt with the original legacy password
             let mut decrypted = Vec::new();
             decrypt(
                 Cursor::new(&v3_data),
                 &mut decrypted,
-                &Password::new(password.clone()),
+                &FilePassword::new(legacy_password_str.clone()),
             )
             .unwrap();
             assert_eq!(decrypted, vec.plaintext.as_bytes());
 
+            // Modern workflow: use random FileKey32
             let new_key = FileKey32::random();
-            let new_password = Password::new(new_key.expose_secret().to_hex());
+            let new_password = FilePassword::new(new_key.expose_secret().to_hex());
 
             let out_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
             let mut f = fs::File::create(&out_file).unwrap();
@@ -138,6 +146,7 @@ fn _run_vector_test(mode: DbMode) {
             )
             .unwrap();
 
+            // Deterministic file_id for logging
             let mut hasher = Hasher::new();
             hasher.update(vec.plaintext.as_bytes());
             hasher.update(version.as_bytes());
@@ -170,7 +179,8 @@ fn _run_vector_test(mode: DbMode) {
 
     #[cfg(feature = "logging")]
     info!(
-        "Vector test complete ({mode:?}) — {} files",
-        log_entries.len()
+        "Vector test complete ({mode:?}) — {} files → {}",
+        log_entries.len(),
+        log_path.display()
     );
 }

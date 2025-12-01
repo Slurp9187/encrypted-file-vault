@@ -22,8 +22,9 @@ pub mod error;
 // Re-export everything users need at the crate root
 pub use aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 pub use config::load as load_config;
-pub use core::{
-    add_file, decrypt_file, encrypt_file, rotate_key, FileEntry, PasswordRepr, Result as CoreResult,
-};
+// pub use core::decrypt_file;
+// pub use core::encrypt_file;
+pub use core::rotate_key;
+pub use core::{add_file, FileEntry, PasswordRepr, Result as CoreResult};
 pub use error::CoreError;
 pub use export::export_to_json;

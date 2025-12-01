@@ -1,6 +1,7 @@
 // tests/core/vault_workflow.rs
 use crate::common::{DbMode, TestDbPair};
-use aescrypt_rs::{aliases::Password, decrypt};
+use aescrypt_rs::decrypt;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
 use encrypted_file_vault::core::*;
 use std::fs;
@@ -37,7 +38,7 @@ fn test_add_file_creates_valid_entry_and_stores_key() {
     decrypt(
         std::io::Cursor::new(fs::read(&enc_path).unwrap()),
         &mut output,
-        &Password::new(hex::encode(&stored)),
+        &FilePassword::new(hex::encode(&stored)),
     )
     .unwrap();
     assert_eq!(output, b"fake pdf content");

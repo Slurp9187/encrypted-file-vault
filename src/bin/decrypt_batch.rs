@@ -1,8 +1,8 @@
 // src/bin/decrypt_batch.rs
 //! Genius Batch Decrypt — [Y/n/A] prompt + final cleanup sweep
 
-use aescrypt_rs::aliases::Password;
 use anyhow::{Context, Result};
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::{core::decrypt_file, index::open_index_db};
 use rpassword::read_password;
 use rusqlite::params;
@@ -32,13 +32,13 @@ fn main() -> Result<()> {
         .ok();
 
     // Load all known passwords once
-    let mut known_passwords: Vec<Password> = index_conn
+    let mut known_passwords: Vec<FilePassword> = index_conn
         .prepare(
             "SELECT DISTINCT known_password_hex FROM files WHERE known_password_hex IS NOT NULL",
         )?
         .query_map([], |row| {
             let hex: String = row.get(0)?;
-            Ok(Password::new(hex))
+            Ok(FilePassword::new(hex))
         })?
         .filter_map(|r| r.ok())
         .collect();
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     let mut decrypted_count = 0;
     let mut failed_count = 0;
     let mut pending_files = vec![];
-    let mut last_password: Option<Password> = None;
+    let mut last_password: Option<FilePassword> = None;
 
     // First pass: try known + last password, stash unknowns
     for entry in WalkDir::new(".")
@@ -125,7 +125,7 @@ fn main() -> Result<()> {
                 print!("Enter password for {}: ", path.display());
                 std::io::stdout().flush()?;
                 let pwd_input = read_password()?;
-                let pwd = Password::new(pwd_input.trim_end().to_owned());
+                let pwd = FilePassword::new(pwd_input.trim_end().to_owned());
                 last_password = Some(pwd.clone());
 
                 if decrypt_file(path, &out_path, &pwd).is_ok() {
@@ -157,7 +157,7 @@ fn main() -> Result<()> {
             print!("Enter password for {}: ", pending.path.display());
             std::io::stdout().flush()?;
             let input = read_password()?;
-            let pwd = Password::new(input.trim_end().to_owned());
+            let pwd = FilePassword::new(input.trim_end().to_owned());
 
             // last_password = Some(pwd.clone());
 

@@ -7,7 +7,7 @@
 
 use std::path::Path;
 
-use aescrypt_rs::aliases::Password;
+use crate::aliases::FilePassword;
 use rusqlite::{params, Connection};
 
 use crate::aliases::SecureConversionsExt;
@@ -45,7 +45,7 @@ pub fn rotate_key_in_vault<P: AsRef<Path>>(
     vault_conn: &mut Connection,
     index_conn: &Connection,
     file_id: &str,
-    old_password: &Password,
+    old_password: &FilePassword,
     note: Option<&str>,
 ) -> Result<Key> {
     // 1. Crypto rotation
@@ -106,7 +106,7 @@ pub fn add_file<P: AsRef<Path>>(
 ) -> Result<FileEntry> {
     let plaintext = std::fs::read(plaintext_path.as_ref())?;
     let key = generate_key();
-    let password = Password::new(key.expose_secret().to_hex());
+    let password = FilePassword::new(key.expose_secret().to_hex());
     encrypt_file(plaintext_path.as_ref(), encrypted_path.as_ref(), &password)?;
     let file_id = blake3_hex(&plaintext);
     // This now correctly inserts into key_history (version 1, note="initial")

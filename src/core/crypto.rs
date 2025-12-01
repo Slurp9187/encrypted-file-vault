@@ -7,7 +7,8 @@
 use std::io::{Cursor, Write};
 use std::sync::{Arc, Mutex};
 
-use aescrypt_rs::{aliases::Password, convert::convert_to_v3, decrypt, encrypt};
+use crate::aliases::FilePassword;
+use aescrypt_rs::{convert::convert_to_v3, decrypt, encrypt};
 
 use crate::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 use crate::consts::{AESCRYPT_V3_HEADER, RANDOM_KEY_KDF_ITERATIONS};
@@ -32,7 +33,7 @@ impl Write for ThreadSafeVec {
 }
 
 /// Encrypt plaintext in memory → returns AES-Crypt v3 ciphertext
-pub fn encrypt_to_vec(plaintext: &[u8], password: &Password) -> Result<Vec<u8>> {
+pub fn encrypt_to_vec(plaintext: &[u8], password: &FilePassword) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     encrypt(
         Cursor::new(plaintext),
@@ -45,14 +46,14 @@ pub fn encrypt_to_vec(plaintext: &[u8], password: &Password) -> Result<Vec<u8>> 
 }
 
 /// Decrypt ciphertext in memory → returns plaintext
-pub fn decrypt_to_vec(ciphertext: &[u8], password: &Password) -> Result<Vec<u8>> {
+pub fn decrypt_to_vec(ciphertext: &[u8], password: &FilePassword) -> Result<Vec<u8>> {
     let mut out = Vec::new();
     decrypt(Cursor::new(ciphertext), &mut out, password).map_err(CoreError::Crypto)?;
     Ok(out)
 }
 
 /// Upgrade legacy AES-Crypt v0–v2 → v3 if needed, otherwise pass through
-pub fn ensure_v3(ciphertext: Vec<u8>, password: &Password) -> Result<Vec<u8>> {
+pub fn ensure_v3(ciphertext: Vec<u8>, password: &FilePassword) -> Result<Vec<u8>> {
     if ciphertext.get(..5) == Some(AESCRYPT_V3_HEADER.as_slice()) {
         return Ok(ciphertext);
     }
@@ -74,11 +75,11 @@ pub fn ensure_v3(ciphertext: Vec<u8>, password: &Password) -> Result<Vec<u8>> {
 }
 
 /// Pure cryptographic key rotation — no file I/O, no DB
-pub fn rotate_key(ciphertext: &[u8], old_password: &Password) -> Result<(Vec<u8>, FileKey32)> {
+pub fn rotate_key(ciphertext: &[u8], old_password: &FilePassword) -> Result<(Vec<u8>, FileKey32)> {
     let v3 = ensure_v3(ciphertext.to_vec(), old_password)?;
     let plaintext = decrypt_to_vec(&v3, old_password)?;
     let new_key = FileKey32::random();
-    let new_password = Password::new(new_key.expose_secret().to_hex());
+    let new_password = FilePassword::new(new_key.expose_secret().to_hex());
     let new_ciphertext = encrypt_to_vec(&plaintext, &new_password)?;
     Ok((new_ciphertext, new_key))
 }

@@ -13,3 +13,4 @@ fixed_alias!(IndexKey32, 32); // Future: separate index encryption key
 // Dynamic secrets
 dynamic_alias!(MasterPassword, String); // For legacy file upgrades
 dynamic_alias!(UserPassphrase, String); // Future: vault unlock passphrase
+dynamic_alias!(FilePassword, String); // Replacement for aescrypt-rs::Password (handles hex keys or legacy strings)

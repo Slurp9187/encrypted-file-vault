@@ -1,5 +1,5 @@
 // tests/core/file.rs
-use aescrypt_rs::aliases::Password;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::core::{decrypt_file, encrypt_file, generate_key};
 use encrypted_file_vault::SecureConversionsExt;
 use std::fs;
@@ -14,7 +14,7 @@ fn test_encrypt_file_and_decrypt_file_roundtrip() {
 
     fs::write(&plain, b"The quick brown fox jumps over the lazy dog").unwrap();
 
-    let password = Password::new(
+    let password = FilePassword::new(
         generate_key() // returns FileKey32
             .expose_secret() // -> &[u8; 32]
             .to_hex(), // now works! because trait is in scope
