@@ -8,8 +8,8 @@ use support::{insert_test_file, TestDbPair};
 
 use encrypted_file_vault::export::export_to_json;
 
-// Bring the secure conversion trait into scope unconditionally
-// This is required for .to_hex() on FileKey32 secrets
+// Bring the secure conversion trait into scope only when needed (for logging)
+#[cfg(feature = "logging")]
 use encrypted_file_vault::aliases::SecureConversionsExt;
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;

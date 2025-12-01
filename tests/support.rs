@@ -2,7 +2,12 @@
 //! Test utilities for encrypted-file-vault integration tests
 //! Now with PERSISTENT mode for decrypt_batch development
 
-use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
+use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
+
+// Gate SecureConversionsExt behind logging, since .to_hex() is only used in logs
+#[cfg(feature = "logging")]
+use encrypted_file_vault::aliases::SecureConversionsExt;
+
 use encrypted_file_vault::{index::open_index_db, vault::open_vault_db};
 use rusqlite::{params, Connection};
 use std::env;

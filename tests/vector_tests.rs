@@ -121,15 +121,15 @@ fn upgrade_and_rotate_official_test_vectors() {
                 )
                 .expect("v0/v1/v2 → v3 conversion failed");
 
-                let len_before = ciphertext.len();
+                let _len_before = ciphertext.len();
                 let data = {
                     let mut guard = buffer.lock().unwrap();
                     std::mem::take(&mut *guard)
                 };
-                let len_after = data.len();
+                let _len_after = data.len();
 
                 #[cfg(feature = "logging")]
-                info!("{version} test {idx:02}: upgraded {len_before} → {len_after} bytes");
+                info!("{version} test {idx:02}: upgraded {_len_before} → {_len_after} bytes");
                 data
             } else {
                 #[cfg(feature = "logging")]
