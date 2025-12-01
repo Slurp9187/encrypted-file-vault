@@ -1,14 +1,11 @@
-// tests/common.rs
-//! Central test utilities — the one place for all shared test code
-//!
-//! Import with: `use crate::common::*;` in every test file
+//! tests/common.rs
+//! Central test utilities — shared across all test modules
 
-#[cfg(feature = "logging")]
-use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+#![allow(dead_code)]
 
 pub mod db {
-    //! Database test fixtures — Fresh vs Persistent mode
     use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
+    use encrypted_file_vault::core::store_key_blob;
     use encrypted_file_vault::{index::open_index_db, vault::open_vault_db};
     use rusqlite::{params, Connection};
     use std::env;
@@ -31,6 +28,10 @@ pub mod db {
     impl TestDbPair {
         pub fn new(mode: DbMode) -> Self {
             let base = PathBuf::from("tests/data");
+
+            if mode == DbMode::Fresh {
+                let _ = fs::remove_dir_all(&base);
+            }
             fs::create_dir_all(&base).expect("create tests/data");
 
             let (subdir, index_name, vault_name) = match mode {
@@ -43,11 +44,6 @@ pub mod db {
 
             let index_path = subdir_path.join(index_name);
             let vault_path = subdir_path.join(vault_name);
-
-            if mode == DbMode::Fresh {
-                let _ = fs::remove_file(&index_path);
-                let _ = fs::remove_file(&vault_path);
-            }
 
             env::set_var("EFV_TEST_MODE", "1");
             env::set_var("EFV_VAULT_DB", vault_path.to_str().unwrap());
@@ -66,28 +62,27 @@ pub mod db {
             }
         }
 
+        #[inline]
         pub fn path(&self) -> &Path {
             &self.base_path
         }
 
+        #[inline]
         pub fn mode(&self) -> DbMode {
             self.mode
         }
 
+        /// Insert a fake file using the SAME connection → trigger fires → keys table populated
         pub fn insert_test_file(
-            &self,
+            &mut self,
             display_name: &str,
             plaintext_size: i64,
         ) -> (String, FileKey32) {
             let key = FileKey32::random();
             let file_id = blake3::hash(key.expose_secret()).to_hex().to_string();
 
-            self.vault
-                .execute(
-                    "INSERT INTO keys (file_id, password_blob, created_at) VALUES (?1, ?2, datetime('now'))",
-                    params![file_id, key.expose_secret() as &[u8]],
-                )
-                .expect("insert key");
+            // This is the key: same connection → trigger fires
+            store_key_blob(&mut self.vault, &file_id, &key).expect("store key blob");
 
             self.index
                 .execute(
@@ -105,7 +100,7 @@ pub mod db {
                         64i64,
                     ],
                 )
-                .expect("insert file metadata");
+                .expect("insert into index");
 
             (file_id, key)
         }
@@ -116,45 +111,6 @@ pub mod db {
             Self::new(DbMode::Fresh)
         }
     }
-
-    // Legacy free function — kept for minimal friction
-    pub fn insert_test_file(
-        db: &TestDbPair,
-        display_name: &str,
-        plaintext_size: i64,
-    ) -> (String, FileKey32) {
-        db.insert_test_file(display_name, plaintext_size)
-    }
 }
 
-/// Initialize test-friendly logging
-pub fn setup_logging() {
-    #[cfg(feature = "logging")]
-    tracing_subscriber::registry()
-        .with(fmt::layer().with_test_writer())
-        .with(EnvFilter::from_default_env())
-        .try_init()
-        .ok();
-}
-
-pub fn setup_logging_info() {
-    #[cfg(feature = "logging")]
-    tracing_subscriber::registry()
-        .with(fmt::layer().with_test_writer())
-        .with(EnvFilter::new("info"))
-        .try_init()
-        .ok();
-}
-
-// ——— TEST PRELUDE: The magic that eliminates 99% of secure-gate pain ———
-
-pub use encrypted_file_vault::{
-    aliases::FileKey32,
-    consts::*,
-    core::*,
-    SecureConversionsExt, // .to_hex(), .to_base64(), etc.
-    SecureRandomExt,      // .random() on fixed aliases
-};
-
-// Re-export our own helpers at the top level
-pub use self::db::{insert_test_file, DbMode, TestDbPair};
+pub use db::{DbMode, TestDbPair};
