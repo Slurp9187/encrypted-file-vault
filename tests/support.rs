@@ -9,16 +9,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)] // We use both variants depending on test mode / CI
 pub enum DbMode {
     Fresh,
     Persistent,
 }
 
+#[allow(dead_code)] // Fields are used in tests (path(), logging, debugging)
 pub struct TestDbPair {
     pub vault: Connection,
     pub index: Connection,
-    pub mode: DbMode,
-    pub base_path: PathBuf,
+    mode: DbMode,
+    base_path: PathBuf,
 }
 
 impl TestDbPair {
@@ -26,13 +28,17 @@ impl TestDbPair {
         let base = PathBuf::from("tests/data");
         fs::create_dir_all(&base).expect("failed to create tests/data");
 
-        let (index_name, vault_name) = match mode {
-            DbMode::Fresh => ("index_fresh.db", "vault_fresh.db"),
-            DbMode::Persistent => ("index_persistent.db", "vault_persistent.db"),
+        // Fresh and Persistent now live in their own subfolders
+        let (subdir, index_name, vault_name) = match mode {
+            DbMode::Fresh => ("db_fresh", "index.db", "vault.db"),
+            DbMode::Persistent => ("db_persistent", "index.db", "vault.db"),
         };
 
-        let index_path = base.join(index_name);
-        let vault_path = base.join(vault_name);
+        let subdir_path = base.join(subdir);
+        fs::create_dir_all(&subdir_path).expect("create subdir");
+
+        let index_path = subdir_path.join(index_name);
+        let vault_path = subdir_path.join(vault_name);
 
         // Always delete fresh DBs → truly clean start
         if mode == DbMode::Fresh {
@@ -53,15 +59,22 @@ impl TestDbPair {
             vault,
             index,
             mode,
-            base_path: base,
+            base_path: subdir_path,
         }
     }
 
+    #[allow(dead_code)]
     pub fn path(&self) -> &Path {
         &self.base_path
     }
 
+    #[allow(dead_code)]
+    pub fn mode(&self) -> DbMode {
+        self.mode
+    }
+
     /// Convenience method used by vector & export tests
+    #[allow(dead_code)]
     pub fn insert_test_file(&self, display_name: &str, plaintext_size: i64) -> (String, FileKey32) {
         let key = FileKey32::random();
         let file_id = blake3::hash(key.expose_secret()).to_hex().to_string();
@@ -102,6 +115,7 @@ impl Default for TestDbPair {
 }
 
 // Legacy free function — kept for minimal changes in other tests
+#[allow(dead_code)]
 pub fn insert_test_file(
     db: &TestDbPair,
     display_name: &str,

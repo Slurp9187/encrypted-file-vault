@@ -1,6 +1,6 @@
 // tests/vector_tests.rs
 mod support;
-use support::{insert_test_file, DbMode, TestDbPair};
+use support::{DbMode, TestDbPair};
 
 use aescrypt_rs::aliases::Password;
 use aescrypt_rs::convert::convert_to_v3;
@@ -15,7 +15,7 @@ use std::io::{Cursor, Write};
 use std::sync::{Arc, Mutex};
 
 #[cfg(feature = "logging")]
-use tracing::{debug, info};
+use tracing::info;
 
 fn init_tracing() {
     #[cfg(feature = "logging")]
