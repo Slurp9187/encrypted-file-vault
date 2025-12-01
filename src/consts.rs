@@ -5,10 +5,6 @@
 // ~0.1–0.2s on modern hardware — good default
 pub const DB_KDF_ITERATIONS: u32 = 256_000;
 
-// /// High-security KDF iterations for per-file keys (AES-Crypt v3)
-// // 600_000 ≈ 0.5–1 second on typical CPU — defense against GPU cracking
-// pub const FILE_KDF_ITERATIONS: u32 = 600_000;
-
 /// KDF iterations when deriving from a human passphrase (future use)
 pub const PASSPHRASE_KDF_ITERATIONS: u32 = 600_000;
 
