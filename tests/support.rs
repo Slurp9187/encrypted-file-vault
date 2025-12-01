@@ -83,7 +83,7 @@ impl TestDbPair {
                     &file_id,
                     &file_id,
                     display_name,
-                    format!("/fake/{}.enc", display_name),
+                    format!("/fake/{}.aes", display_name),
                     plaintext_size,
                     "human",
                     64i64,

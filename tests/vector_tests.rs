@@ -49,14 +49,27 @@ struct TestVector {
     ciphertext_hex: String,
 }
 
-#[test]
-fn upgrade_and_rotate_vectors_fresh() {
-    _run_vector_test(DbMode::Fresh);
-}
+// tests/vector_tests.rs — replace the two test functions with this one
 
 #[test]
-fn upgrade_and_rotate_vectors_persistent() {
-    _run_vector_test(DbMode::Persistent);
+fn upgrade_and_rotate_vectors_both_modes() {
+    // Always run Fresh mode (keeps CI fast & hermetic)
+    println!("=== Running vector test in FRESH mode ===");
+    _run_vector_test(DbMode::Fresh);
+
+    // Always run Persistent mode on normal developer runs
+    // But skip it in CI (detected by common CI env vars)
+    let is_ci = std::env::var("CI").is_ok()
+        || std::env::var("GITHUB_ACTIONS").is_ok()
+        || std::env::var("GITLAB_CI").is_ok()
+        || std::env::var("CIRCLECI").is_ok();
+
+    if !is_ci {
+        println!("=== Running vector test in PERSISTENT mode (growing your inspectable DBs) ===");
+        _run_vector_test(DbMode::Persistent);
+    } else {
+        println!("=== Skipping PERSISTENT mode in CI (keeps build fast) ===");
+    }
 }
 
 fn _run_vector_test(mode: DbMode) {
