@@ -1,6 +1,6 @@
 // tests/vector_tests.rs
-mod support;
-use support::{DbMode, TestDbPair};
+mod common;
+use common::{DbMode, TestDbPair};
 
 use aescrypt_rs::aliases::Password;
 use aescrypt_rs::convert::convert_to_v3;

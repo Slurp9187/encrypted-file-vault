@@ -1,8 +1,8 @@
 // tests/db_tests.rs
 //! Integration tests for export functionality using real databases
 
-mod support;
-use support::{insert_test_file, DbMode, TestDbPair}; // ← added DbMode import
+mod common;
+use common::{insert_test_file, DbMode, TestDbPair}; // ← added DbMode import
 
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
