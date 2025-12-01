@@ -220,10 +220,18 @@ fn test_add_file_creates_valid_entry_and_stores_key() {
     std::env::set_var("EFV_VAULT_KEY", "test-vault");
     std::env::set_var("EFV_INDEX_KEY", "test-index");
 
-    let vault_conn = vault::open_vault_db().unwrap();
+    let mut vault_conn = vault::open_vault_db().unwrap();
     let index_conn = index::open_index_db().unwrap();
 
-    let entry = add_file(&plain_path, &enc_path, &vault_conn, &index_conn, None, None).unwrap();
+    let entry = add_file(
+        &plain_path,
+        &enc_path,
+        &mut vault_conn,
+        &index_conn,
+        None,
+        None,
+    )
+    .unwrap();
 
     assert!(enc_path.exists());
     assert_eq!(entry.display_name, "doc.pdf");
@@ -281,11 +289,11 @@ fn test_store_and_retrieve_key_blob_via_db() {
     let _dir = tempdir().unwrap();
     std::env::set_var("EFV_VAULT_KEY", "test");
 
-    let conn = vault::open_vault_db().unwrap();
+    let mut conn = vault::open_vault_db().unwrap();
     let key = generate_key();
     let file_id = "myfile123";
 
-    store_key_blob(&conn, file_id, &key).unwrap();
+    store_key_blob(&mut conn, file_id, &key).unwrap();
 
     let retrieved: Vec<u8> = conn
         .query_row(
@@ -309,13 +317,13 @@ fn test_add_file_uses_defaults_when_options_none() {
     std::env::set_var("EFV_VAULT_KEY", "x");
     std::env::set_var("EFV_INDEX_KEY", "y");
 
-    let vault_conn = vault::open_vault_db().unwrap();
+    let mut vault_conn = vault::open_vault_db().unwrap();
     let index_conn = index::open_index_db().unwrap();
 
     let entry = add_file(
         &plain,
         &dir.path().join("note.txt.aes"),
-        &vault_conn,
+        &mut vault_conn,
         &index_conn,
         None,
         None,

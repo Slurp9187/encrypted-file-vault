@@ -9,6 +9,7 @@ use aescrypt_rs::{aliases::Password, convert::convert_to_v3, decrypt, encrypt};
 use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
 use base64::Engine;
 use blake3::Hasher;
+// use rusqlite::Transaction;
 use rusqlite::{params, Connection};
 use secure_gate::SecureConversionsExt;
 
@@ -81,14 +82,11 @@ pub fn ensure_v3(ciphertext: Vec<u8>, password: &Password) -> Result<Vec<u8>> {
     )
     .map_err(CoreError::Crypto)?;
 
-    // Fix #1: Extract the Vec while the MutexGuard is still alive
     let mut guard = buffer.lock().unwrap();
     let result = std::mem::take(&mut *guard);
-    // guard is dropped here → lock released → buffer can be dropped safely
     Ok(result)
 }
 
-/// Fixed: decrypt_file — don't move plaintext after writing
 pub fn decrypt_file<P: AsRef<Path>>(
     input_path: P,
     output_path: P,
@@ -96,11 +94,11 @@ pub fn decrypt_file<P: AsRef<Path>>(
 ) -> Result<u64> {
     let ciphertext = std::fs::read(input_path)?;
     let plaintext = decrypt_to_vec(&ciphertext, password)?;
-    std::fs::write(&output_path, &plaintext)?; // borrow, don't move
+    std::fs::write(&output_path, &plaintext)?;
     Ok(plaintext.len() as u64)
 }
 
-/// Rest of the file — unchanged and correct
+/// Pure crypto rotation — no DB involvement
 pub fn rotate_key(ciphertext: &[u8], old_password: &Password) -> Result<(Vec<u8>, Key)> {
     let v3 = ensure_v3(ciphertext.to_vec(), old_password)?;
     let plaintext = decrypt_to_vec(&v3, old_password)?;
@@ -121,12 +119,79 @@ pub fn encrypt_file<P: AsRef<Path>>(
     Ok(plaintext.len() as u64)
 }
 
-pub fn store_key_blob(conn: &Connection, file_id: &str, key: &Key) -> rusqlite::Result<()> {
-    conn.execute(
-        "INSERT OR REPLACE INTO keys (file_id, password_blob, created_at) VALUES (?1, ?2, datetime('now'))",
-        params![file_id, key.expose_secret() as &[u8]],
+/// Store a key blob + insert into key_history (trigger keeps `keys` table in sync)
+pub fn store_key_blob(conn: &mut Connection, file_id: &str, key: &Key) -> rusqlite::Result<()> {
+    let tx = conn.transaction()?;
+    // Get next version number
+    let version: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(version), 0) + 1 FROM key_history WHERE file_id = ?1",
+        [file_id],
+        |row| row.get(0),
     )?;
+    let note = if version == 1 { "initial" } else { "update" };
+    tx.execute(
+        "INSERT INTO key_history (file_id, version, password_blob, note)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![file_id, version, key.expose_secret() as &[u8], note],
+    )?;
+    tx.commit()?;
     Ok(())
+}
+
+/// Full vault-aware rotation: re-encrypts file + atomically updates key_history
+pub fn rotate_key_in_vault<P: AsRef<Path>>(
+    encrypted_path: P,
+    vault_conn: &mut Connection,
+    index_conn: &Connection,
+    file_id: &str,
+    old_password: &Password,
+    note: Option<&str>,
+) -> Result<Key> {
+    // 1. Crypto rotation
+    let ciphertext = std::fs::read(&encrypted_path)?;
+    let (new_ciphertext, new_key) = rotate_key(&ciphertext, old_password)?;
+    std::fs::write(&encrypted_path, new_ciphertext)?;
+    // 2. DB transaction
+    let tx = vault_conn.transaction().map_err(CoreError::Sql)?;
+    // Get current version
+    let current_version: i64 = tx.query_row(
+        "SELECT COALESCE(MAX(version), 0) FROM key_history WHERE file_id = ?1",
+        [file_id],
+        |row| row.get(0),
+    )?;
+    if current_version == 0 {
+        return Err(CoreError::Sql(rusqlite::Error::QueryReturnedNoRows));
+    }
+    let new_version = current_version + 1;
+    // Mark previous version as superseded
+    tx.execute(
+        "UPDATE key_history SET superseded_at = datetime('now')
+         WHERE file_id = ?1 AND version = ?2",
+        params![file_id, current_version],
+    )
+    .map_err(CoreError::Sql)?;
+    // Insert new version
+    tx.execute(
+        "INSERT INTO key_history (file_id, version, password_blob, note)
+         VALUES (?1, ?2, ?3, ?4)",
+        params![
+            file_id,
+            new_version,
+            new_key.expose_secret() as &[u8],
+            note.unwrap_or("rotation")
+        ],
+    )
+    .map_err(CoreError::Sql)?;
+    // Commit before index update (still atomic enough for our threat model)
+    tx.commit().map_err(CoreError::Sql)?;
+    // Update index DB
+    index_conn
+        .execute(
+            "UPDATE files SET rotated_at = datetime('now') WHERE file_id = ?1",
+            [file_id],
+        )
+        .map_err(CoreError::Sql)?;
+    Ok(new_key)
 }
 
 #[derive(Debug, Clone)]
@@ -165,7 +230,7 @@ pub fn store_file_entry(conn: &Connection, entry: &FileEntry) -> rusqlite::Resul
 pub fn add_file<P: AsRef<Path>>(
     plaintext_path: P,
     encrypted_path: P,
-    vault_conn: &Connection,
+    vault_conn: &mut Connection,
     index_conn: &Connection,
     filename_style: Option<&str>,
     id_length_hex: Option<u64>,
@@ -173,13 +238,10 @@ pub fn add_file<P: AsRef<Path>>(
     let plaintext = std::fs::read(&plaintext_path)?;
     let key = generate_key();
     let password = Password::new(key.expose_secret().to_hex());
-
     encrypt_file(&plaintext_path, &encrypted_path, &password)?;
-
     let file_id = blake3_hex(&plaintext);
-
+    // This now correctly inserts into key_history (version 1, note="initial")
     store_key_blob(vault_conn, &file_id, &key)?;
-
     let entry = FileEntry {
         file_id: file_id.clone(),
         content_hash: file_id,
@@ -195,7 +257,6 @@ pub fn add_file<P: AsRef<Path>>(
         id_length_hex: id_length_hex.unwrap_or(DEFAULT_ID_LENGTH_HEX as u64),
         known_password_hex: Some(key.expose_secret().to_hex()),
     };
-
     store_file_entry(index_conn, &entry)?;
     Ok(entry)
 }

@@ -41,6 +41,32 @@ pub fn open_vault_db() -> Result<Connection> {
             created_at    TEXT NOT NULL,
             rotated_at    TEXT
         );
+
+        CREATE TABLE IF NOT EXISTS key_history (
+            file_id       TEXT    NOT NULL,
+            version       INTEGER NOT NULL,
+            password_blob BLOB    NOT NULL,
+            created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+            superseded_at TEXT,
+            note          TEXT,
+            PRIMARY KEY (file_id, version)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_key_history_file_id ON key_history(file_id);
+        CREATE INDEX IF NOT EXISTS idx_key_history_created_at ON key_history(created_at);
+
+        -- Back-fill history for existing files (version 1 = current key)
+        INSERT OR IGNORE INTO key_history (file_id, version, password_blob, created_at)
+        SELECT file_id, 1, password_blob, created_at FROM keys;
+
+        -- Ensure current row in `keys` is always the latest version
+        CREATE TRIGGER IF NOT EXISTS sync_current_key_after_insert
+        AFTER INSERT ON key_history
+        WHEN NEW.superseded_at IS NULL
+        BEGIN
+            INSERT OR REPLACE INTO keys (file_id, password_blob, created_at, rotated_at)
+            VALUES (NEW.file_id, NEW.password_blob, NEW.created_at, NULL);
+        END;
         "#
     ))?;
 
