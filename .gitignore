@@ -1,0 +1,12 @@
+/target* 
+*.bak
+*.del
+Cargo.lock
+dev-config.toml
+code_packages/
+scripts/gen_data.py
+tests/data
+tests/vector/data/aes_test_files
+tests/vector/data/scripts
+tests/**/*.db
+tests/**/*.sqbpro
