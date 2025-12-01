@@ -1,23 +1,15 @@
 // tests/support.rs
-//! Test utilities for encrypted-file-vault integration tests
-//! Now with PERSISTENT mode for decrypt_batch development
-
-use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
-
-// Gate SecureConversionsExt behind logging, since .to_hex() is only used in logs
 #[cfg(feature = "logging")]
 use encrypted_file_vault::aliases::SecureConversionsExt;
-
+use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
 use encrypted_file_vault::{index::open_index_db, vault::open_vault_db};
 use rusqlite::{params, Connection};
 use std::env;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
-// Conditional tracing imports
 #[cfg(feature = "logging")]
 use tracing::{debug, info};
-
 #[cfg(feature = "logging")]
 use tracing_subscriber::EnvFilter;
 
@@ -32,144 +24,45 @@ pub fn init_test_logging() {
                 .try_init();
         });
     }
-    #[cfg(not(feature = "logging"))]
-    {
-        // no-op
-    }
 }
 
 pub struct TestDbPair {
-    _temp_dir: Option<TempDir>,        // None = persistent mode
-    _persistent_path: Option<PathBuf>, // For temp_dir() in persistent mode
+    temp_dir: TempDir,
     pub vault: Connection,
     pub index: Connection,
-    _env_guard: EnvGuard,
-}
-
-struct EnvGuard {
-    old_home: Option<String>,
-    old_profile: Option<String>,
-    old_vault_key: Option<String>,
-    old_index_key: Option<String>,
-}
-
-impl Drop for EnvGuard {
-    fn drop(&mut self) {
-        if let Some(v) = &self.old_home {
-            env::set_var("HOME", v);
-        } else {
-            env::remove_var("HOME");
-        }
-        if let Some(v) = &self.old_profile {
-            env::set_var("USERPROFILE", v);
-        } else {
-            env::remove_var("USERPROFILE");
-        }
-        if let Some(v) = &self.old_vault_key {
-            env::set_var("EFV_VAULT_KEY", v);
-        } else {
-            env::remove_var("EFV_VAULT_KEY");
-        }
-        if let Some(v) = &self.old_index_key {
-            env::set_var("EFV_INDEX_KEY", v);
-        } else {
-            env::remove_var("EFV_INDEX_KEY");
-        }
-        #[cfg(feature = "logging")]
-        debug!("TestDbPair dropped — original environment restored");
-    }
 }
 
 impl TestDbPair {
-    /// Fresh, isolated DBs — default for all tests
     pub fn new() -> Self {
-        Self::new_internal(true)
-    }
-
-    /// PERSISTENT DBs — kept across test runs in ./test_persistent_dbs/
-    #[allow(dead_code)]
-    pub fn persistent() -> Self {
-        #[cfg(feature = "logging")]
-        info!("PERSISTENT TestDbPair — using ./test_persistent_dbs/");
-        Self::new_internal(false)
-    }
-
-    fn new_internal(ephemeral: bool) -> Self {
         init_test_logging();
 
-        let (temp_dir, persistent_path) = if ephemeral {
-            let temp = TempDir::new().expect("Failed to create temp dir");
-            #[cfg(feature = "logging")]
-            info!("Created ephemeral test directory: {:?}", temp.path());
-            (Some(temp), None)
-        } else {
-            let path = PathBuf::from("./test_persistent_dbs");
-            std::fs::create_dir_all(&path).ok();
-            #[cfg(feature = "logging")]
-            info!("Using persistent test directory: {:?}", path);
-            (None, Some(path))
-        };
+        let temp_dir = TempDir::new().expect("failed to create temp dir");
 
-        let old_home = env::var("HOME").ok();
-        let old_profile = env::var("USERPROFILE").ok();
-        let old_vault_key = env::var("EFV_VAULT_KEY").ok();
-        let old_index_key = env::var("EFV_INDEX_KEY").ok();
-
-        let root_path: PathBuf = persistent_path
-            .clone()
-            .or_else(|| temp_dir.as_ref().map(|t| t.path().to_owned()))
-            .unwrap();
-
-        env::set_var("HOME", root_path.to_str().unwrap());
-        env::set_var("USERPROFILE", root_path.to_str().unwrap());
-        env::set_var("EFV_VAULT_KEY", "test-vault-secret-123");
-        env::set_var("EFV_INDEX_KEY", "test-index-secret-456");
-
-        #[cfg(feature = "logging")]
-        debug!("Environment overridden for test isolation");
-
-        let env_guard = EnvGuard {
-            old_home,
-            old_profile,
-            old_vault_key,
-            old_index_key,
-        };
-
-        let vault = open_vault_db().expect("Failed to open vault DB");
-        let index = open_index_db().expect("Failed to open index DB");
-
-        if ephemeral {
-            vault.execute("DELETE FROM keys;", params![]).unwrap();
-            index.execute("DELETE FROM files;", params![]).unwrap();
-            #[cfg(feature = "logging")]
-            debug!("Cleared existing data from vault and index databases");
-        } else {
-            #[cfg(feature = "logging")]
-            info!("Persistent mode — keeping existing data in ./test_persistent_dbs/");
-        }
-
-        #[cfg(feature = "logging")]
-        info!(
-            "TestDbPair ready — {} mode",
-            if ephemeral { "ephemeral" } else { "PERSISTENT" }
+        // Force test mode + unique DB paths
+        env::set_var("EFV_TEST_MODE", "1");
+        env::set_var(
+            "EFV_VAULT_DB",
+            temp_dir.path().join("vault.db").to_str().unwrap(),
         );
+        env::set_var(
+            "EFV_INDEX_DB",
+            temp_dir.path().join("index.db").to_str().unwrap(),
+        );
+        env::set_var("EFV_VAULT_KEY", "test-vault-secret");
+        env::set_var("EFV_INDEX_KEY", "test-index-secret");
+
+        let vault = open_vault_db().expect("open vault db");
+        let index = open_index_db().expect("open index db");
 
         Self {
-            _temp_dir: temp_dir,
-            _persistent_path: persistent_path,
+            temp_dir,
             vault,
             index,
-            _env_guard: env_guard,
         }
     }
 
-    #[allow(dead_code)]
     pub fn temp_dir(&self) -> &Path {
-        self._temp_dir
-            .as_ref()
-            .map(|t| t.path())
-            .or(self._persistent_path.as_deref())
-            .unwrap_or_else(|| Path::new("./test_persistent_dbs"))
+        self.temp_dir.path()
     }
 }
 
@@ -187,19 +80,12 @@ pub fn insert_test_file(
     let key = FileKey32::random();
     let file_id = blake3::hash(key.expose_secret()).to_hex().to_string();
 
-    #[cfg(feature = "logging")]
-    debug!("Inserting test file: \"{display_name}\" (size: {plaintext_size} bytes)");
-    #[cfg(feature = "logging")]
-    debug!("Generated file key: {}", key.expose_secret().to_hex());
-    #[cfg(feature = "logging")]
-    debug!("Derived file_id: {file_id}");
-
     db.vault
         .execute(
             "INSERT INTO keys (file_id, password_blob, created_at) VALUES (?1, ?2, datetime('now'))",
             params![file_id, key.expose_secret() as &[u8]],
         )
-        .expect("failed to insert key into vault DB");
+        .expect("insert key");
 
     db.index
         .execute(
@@ -219,10 +105,7 @@ pub fn insert_test_file(
                 64i64,
             ],
         )
-        .expect("failed to insert file metadata");
-
-    #[cfg(feature = "logging")]
-    info!("Test file inserted — file_id = {file_id}");
+        .expect("insert file");
 
     (file_id, key)
 }

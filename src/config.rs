@@ -37,12 +37,11 @@ pub fn load() -> &'static Config {
         let config_path =
             std::env::var("EFV_CONFIG").unwrap_or_else(|_| "dev-config.toml".to_string());
 
-        if std::path::Path::new(&config_path).exists() {
+        let mut conf: Config = if std::path::Path::new(&config_path).exists() {
             let content =
                 std::fs::read_to_string(&config_path).expect("Failed to read dev-config.toml");
             toml::from_str(&content).expect("Invalid TOML in dev-config.toml")
         } else {
-            // Default dev config if file missing
             eprintln!("Warning: dev-config.toml not found — using built-in defaults");
             Config {
                 keys: Keys {
@@ -59,6 +58,13 @@ pub fn load() -> &'static Config {
                     allow_insecure_export: true,
                 },
             }
+        };
+
+        // Critical for tests: force real env-var keys instead of dev keys
+        if std::env::var("EFV_TEST_MODE").is_ok() {
+            conf.features.use_dev_keys = false;
         }
+
+        conf
     })
 }

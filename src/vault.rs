@@ -1,19 +1,19 @@
-use std::{fs, path::Path};
-
-use rusqlite::{Connection, Result};
-
-use crate::consts::DB_KDF_ITERATIONS;
-
 // src/vault.rs
+use crate::consts::DB_KDF_ITERATIONS;
+use rusqlite::{Connection, Result};
+use std::{env, fs, path::Path};
+
 pub fn open_vault_db() -> Result<Connection> {
     let config = crate::config::load();
-    let db_path = &config.paths.vault_db;
 
-    if let Some(parent) = Path::new(db_path).parent() {
+    // Allow full test isolation via env vars
+    let db_path = env::var("EFV_VAULT_DB").unwrap_or_else(|_| config.paths.vault_db.clone());
+
+    if let Some(parent) = Path::new(&db_path).parent() {
         let _ = fs::create_dir_all(parent);
     }
 
-    let conn = Connection::open(db_path)?;
+    let conn = Connection::open(&db_path)?;
 
     let key: &str = if config.features.use_dev_keys {
         config.keys.vault_key.as_str()
@@ -26,7 +26,6 @@ pub fn open_vault_db() -> Result<Connection> {
     };
 
     conn.execute_batch(&format!("PRAGMA key = '{key}';"))?;
-
     conn.execute_batch(&format!(
         r#"
         PRAGMA cipher_page_size = 4096;
@@ -36,30 +35,29 @@ pub fn open_vault_db() -> Result<Connection> {
         PRAGMA cipher_plaintext_header_size = 0;
 
         CREATE TABLE IF NOT EXISTS keys (
-            file_id       TEXT PRIMARY KEY,
+            file_id TEXT PRIMARY KEY,
             password_blob BLOB NOT NULL,
-            created_at    TEXT NOT NULL,
-            rotated_at    TEXT
+            created_at TEXT NOT NULL,
+            rotated_at TEXT
         );
 
         CREATE TABLE IF NOT EXISTS key_history (
-            file_id       TEXT    NOT NULL,
-            version       INTEGER NOT NULL,
-            password_blob BLOB    NOT NULL,
-            created_at    TEXT    NOT NULL DEFAULT (datetime('now')),
+            file_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            password_blob BLOB NOT NULL,
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
             superseded_at TEXT,
-            note          TEXT,
+            note TEXT,
             PRIMARY KEY (file_id, version)
         );
 
         CREATE INDEX IF NOT EXISTS idx_key_history_file_id ON key_history(file_id);
-        CREATE INDEX IF NOT EXISTS idx_key_history_created_at ON key_history(created_at);
 
-        -- Back-fill history for existing files (version 1 = current key)
+        -- Back-fill history for legacy rows
         INSERT OR IGNORE INTO key_history (file_id, version, password_blob, created_at)
         SELECT file_id, 1, password_blob, created_at FROM keys;
 
-        -- Ensure current row in `keys` is always the latest version
+        -- Keep `keys` table always in sync with latest version
         CREATE TRIGGER IF NOT EXISTS sync_current_key_after_insert
         AFTER INSERT ON key_history
         WHEN NEW.superseded_at IS NULL

@@ -1,19 +1,18 @@
 // src/index.rs
-use std::{fs, path::Path};
-
-use rusqlite::{Connection, Result};
-
 use crate::consts::DB_KDF_ITERATIONS;
+use rusqlite::{Connection, Result};
+use std::{env, fs, path::Path};
 
 pub fn open_index_db() -> Result<Connection> {
     let config = crate::config::load();
-    let db_path = &config.paths.index_db;
 
-    if let Some(parent) = Path::new(db_path).parent() {
+    let db_path = env::var("EFV_INDEX_DB").unwrap_or_else(|_| config.paths.index_db.clone());
+
+    if let Some(parent) = Path::new(&db_path).parent() {
         let _ = fs::create_dir_all(parent);
     }
 
-    let conn = Connection::open(db_path)?;
+    let conn = Connection::open(&db_path)?;
 
     let key: &str = if config.features.use_dev_keys {
         config.keys.index_key.as_str()
@@ -36,9 +35,6 @@ pub fn open_index_db() -> Result<Connection> {
         "#
     ))?;
 
-    // Safe migration: add column only if it doesn't exist
-    // SQLite doesn't support IF NOT EXISTS on ALTER TABLE until 3.35.0
-    // So we do it the safe way: try, ignore error if column exists
     let _ = conn.execute(
         "ALTER TABLE files ADD COLUMN encryption_algo TEXT NOT NULL DEFAULT 'AESCryptV3'",
         [],
