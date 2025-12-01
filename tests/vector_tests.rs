@@ -2,11 +2,11 @@
 mod common;
 use common::{DbMode, TestDbPair};
 
-use aescrypt_rs::aliases::Password;
 use aescrypt_rs::convert::convert_to_v3;
 use aescrypt_rs::{decrypt, encrypt};
 use blake3::Hasher;
 use chrono::Utc;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -100,7 +100,7 @@ fn _run_vector_test(mode: DbMode) {
                     convert_to_v3(
                         Cursor::new(&ciphertext),
                         writer,
-                        &Password::new(legacy_password.clone()),
+                        &FilePassword::new(legacy_password.clone()),
                         iterations,
                     )
                     .expect("convert_to_v3 failed");
@@ -119,13 +119,13 @@ fn _run_vector_test(mode: DbMode) {
             decrypt(
                 Cursor::new(&v3_data),
                 &mut decrypted,
-                &Password::new(legacy_password.clone()),
+                &FilePassword::new(legacy_password.clone()),
             )
             .unwrap();
             assert_eq!(decrypted, vec.plaintext.as_bytes());
 
             let new_key = FileKey32::random();
-            let new_password = Password::new(new_key.expose_secret().to_hex());
+            let new_password = FilePassword::new(new_key.expose_secret().to_hex());
 
             let out_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
             let mut f = fs::File::create(&out_file).unwrap();

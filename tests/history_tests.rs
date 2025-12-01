@@ -1,7 +1,7 @@
 // tests/history_tests.rs
 //! Tests for the new key-history feature
 
-use aescrypt_rs::aliases::Password;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::core::*;
 use encrypted_file_vault::vault;
 use rusqlite::params;
@@ -80,7 +80,7 @@ fn test_rotate_key_in_vault_updates_history() -> TestResult {
     let entry = add_file(&plain_path, &enc_path, &mut db.vault, &db.index, None, None)?;
 
     let file_id = entry.file_id.clone();
-    let old_password = Password::new(entry.known_password_hex.unwrap());
+    let old_password = FilePassword::new(entry.known_password_hex.unwrap());
 
     let new_key = rotate_key_in_vault(
         &enc_path,

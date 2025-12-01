@@ -1,5 +1,5 @@
 // tests/core/crypto.rs
-use aescrypt_rs::aliases::Password;
+use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::consts::AESCRYPT_V3_HEADER;
 use encrypted_file_vault::core::*;
 use encrypted_file_vault::error::CoreError;
@@ -9,7 +9,7 @@ use encrypted_file_vault::SecureConversionsExt;
 fn test_encrypt_decrypt_roundtrip_in_memory() {
     let plaintext = b"Attack at dawn!";
     let key = generate_key();
-    let password = Password::new(key.expose_secret().to_hex());
+    let password = FilePassword::new(key.expose_secret().to_hex());
     let ciphertext = encrypt_to_vec(plaintext, &password).unwrap();
     let decrypted = decrypt_to_vec(&ciphertext, &password).unwrap();
     assert!(ciphertext.starts_with(b"AES"));
@@ -20,7 +20,7 @@ fn test_encrypt_decrypt_roundtrip_in_memory() {
 fn test_encrypt_to_vec_produces_v3_header() {
     let ciphertext = encrypt_to_vec(
         b"small",
-        &Password::new(generate_key().expose_secret().to_hex()),
+        &FilePassword::new(generate_key().expose_secret().to_hex()),
     )
     .unwrap();
     assert_eq!(&ciphertext[..5], *AESCRYPT_V3_HEADER);
@@ -30,7 +30,7 @@ fn test_encrypt_to_vec_produces_v3_header() {
 fn test_is_aescrypt_file_and_version() {
     let ciphertext = encrypt_to_vec(
         b"test",
-        &Password::new(generate_key().expose_secret().to_hex()),
+        &FilePassword::new(generate_key().expose_secret().to_hex()),
     )
     .unwrap();
     assert!(is_aescrypt_file(&ciphertext));
@@ -41,7 +41,7 @@ fn test_is_aescrypt_file_and_version() {
 #[test]
 fn test_ensure_v3_returns_error_on_invalid_legacy() {
     let legacy = vec![0x41, 0x45, 0x53, 0x00, 0x00, 0x00, 0x00, 0x00];
-    let result = ensure_v3(legacy, &Password::new("wrong".to_owned()));
+    let result = ensure_v3(legacy, &FilePassword::new("wrong".to_owned()));
     assert!(result.is_err());
 }
 
@@ -49,10 +49,10 @@ fn test_ensure_v3_returns_error_on_invalid_legacy() {
 fn test_ensure_v3_passes_through_v3_unchanged() {
     let v3 = encrypt_to_vec(
         b"v3",
-        &Password::new(generate_key().expose_secret().to_hex()),
+        &FilePassword::new(generate_key().expose_secret().to_hex()),
     )
     .unwrap();
-    let result = ensure_v3(v3.clone(), &Password::new("any".to_owned())).unwrap();
+    let result = ensure_v3(v3.clone(), &FilePassword::new("any".to_owned())).unwrap();
     assert_eq!(v3, result);
 }
 
@@ -60,7 +60,7 @@ fn test_ensure_v3_passes_through_v3_unchanged() {
 fn test_rotate_key_produces_different_ciphertext_and_new_key() {
     let plaintext = b"secret message";
     let old_key = generate_key();
-    let old_password = Password::new(old_key.expose_secret().to_hex());
+    let old_password = FilePassword::new(old_key.expose_secret().to_hex());
     let original = encrypt_to_vec(plaintext, &old_password).unwrap();
 
     let (new_ciphertext, new_key) = rotate_key(&original, &old_password).unwrap();
@@ -73,7 +73,7 @@ fn test_rotate_key_produces_different_ciphertext_and_new_key() {
 
     let decrypted = decrypt_to_vec(
         &new_ciphertext,
-        &Password::new(new_key.expose_secret().to_hex()),
+        &FilePassword::new(new_key.expose_secret().to_hex()),
     )
     .unwrap();
     assert_eq!(plaintext.as_slice(), decrypted.as_slice());
@@ -86,9 +86,12 @@ fn test_decrypt_fails_with_wrong_password() {
     let key2 = generate_key();
 
     let ciphertext =
-        encrypt_to_vec(plaintext, &Password::new(key1.expose_secret().to_hex())).unwrap();
+        encrypt_to_vec(plaintext, &FilePassword::new(key1.expose_secret().to_hex())).unwrap();
 
-    let wrong = decrypt_to_vec(&ciphertext, &Password::new(key2.expose_secret().to_hex()));
+    let wrong = decrypt_to_vec(
+        &ciphertext,
+        &FilePassword::new(key2.expose_secret().to_hex()),
+    );
     assert!(wrong.is_err());
     assert!(matches!(wrong, Err(CoreError::Crypto(_))));
 }
