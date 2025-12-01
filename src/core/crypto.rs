@@ -10,7 +10,8 @@ use std::sync::{Arc, Mutex};
 use aescrypt_rs::{aliases::Password, convert::convert_to_v3, decrypt, encrypt};
 
 use crate::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
-use crate::consts::{AESCRYPT_V3_HEADER, FILE_KDF_ITERATIONS};
+use crate::consts::{AESCRYPT_V3_HEADER, RANDOM_KEY_KDF_ITERATIONS};
+// use crate::consts::FILE_KDF_ITERATIONS;
 use crate::error::CoreError;
 
 pub type Result<T> = std::result::Result<T, CoreError>;
@@ -37,7 +38,7 @@ pub fn encrypt_to_vec(plaintext: &[u8], password: &Password) -> Result<Vec<u8>> 
         Cursor::new(plaintext),
         &mut out,
         password,
-        FILE_KDF_ITERATIONS,
+        RANDOM_KEY_KDF_ITERATIONS,
     )
     .map_err(CoreError::Crypto)?;
     Ok(out)
@@ -63,7 +64,7 @@ pub fn ensure_v3(ciphertext: Vec<u8>, password: &Password) -> Result<Vec<u8>> {
         Cursor::new(ciphertext),
         writer,
         password,
-        FILE_KDF_ITERATIONS,
+        RANDOM_KEY_KDF_ITERATIONS,
     )
     .map_err(CoreError::Crypto)?;
 

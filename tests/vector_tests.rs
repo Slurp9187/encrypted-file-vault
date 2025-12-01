@@ -1,6 +1,6 @@
 // tests/vector_tests.rs
-mod support;
-use support::{DbMode, TestDbPair};
+mod common;
+use common::{DbMode, TestDbPair};
 
 use aescrypt_rs::aliases::Password;
 use aescrypt_rs::convert::convert_to_v3;
@@ -19,15 +19,14 @@ use tracing::info;
 
 fn init_tracing() {
     #[cfg(feature = "logging")]
-    {
-        static INIT: std::sync::Once = std::sync::Once::new();
-        INIT.call_once(|| {
-            let _ = tracing_subscriber::fmt()
-                .with_test_writer()
-                .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-                .try_init();
-        });
-    }
+    static INIT: std::sync::Once = std::sync::Once::new();
+    #[cfg(feature = "logging")]
+    INIT.call_once(|| {
+        let _ = tracing_subscriber::fmt()
+            .with_test_writer()
+            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+            .try_init();
+    });
 }
 
 #[derive(Clone)]
@@ -49,47 +48,38 @@ struct TestVector {
     ciphertext_hex: String,
 }
 
-// tests/vector_tests.rs — replace the two test functions with this one
-
 #[test]
 fn upgrade_and_rotate_vectors_both_modes() {
-    // Always run Fresh mode (keeps CI fast & hermetic)
-    println!("=== Running vector test in FRESH mode ===");
-    _run_vector_test(DbMode::Fresh);
+    init_tracing();
 
-    // Always run Persistent mode on normal developer runs
-    // But skip it in CI (detected by common CI env vars)
-    let is_ci = std::env::var("CI").is_ok()
+    let modes = if std::env::var("CI").is_ok()
         || std::env::var("GITHUB_ACTIONS").is_ok()
         || std::env::var("GITLAB_CI").is_ok()
-        || std::env::var("CIRCLECI").is_ok();
-
-    if !is_ci {
-        println!("=== Running vector test in PERSISTENT mode (growing your inspectable DBs) ===");
-        _run_vector_test(DbMode::Persistent);
+        || std::env::var("CIRCLECI").is_ok()
+    {
+        vec![DbMode::Fresh]
     } else {
-        println!("=== Skipping PERSISTENT mode in CI (keeps build fast) ===");
+        vec![DbMode::Fresh, DbMode::Persistent]
+    };
+
+    for &mode in &modes {
+        println!("=== Running vector test in {mode:?} mode ===");
+        _run_vector_test(mode);
     }
 }
 
 fn _run_vector_test(mode: DbMode) {
-    init_tracing();
-
     #[cfg(feature = "logging")]
-    info!("Starting vector upgrade & rotation test — mode: {mode:?}");
+    info!("Starting vector test — mode: {mode:?}");
 
-    let db = TestDbPair::new(mode);
-
-    #[cfg(feature = "logging")]
-    info!("Using databases in {:?} — mode: {mode:?}", db.path());
+    let mut db = TestDbPair::new(mode); // mutable!
 
     let output_dir = db.path().join("output");
     let _ = fs::remove_dir_all(&output_dir);
     fs::create_dir_all(&output_dir).unwrap();
+    let log_path = output_dir.join(format!("vector_log_{mode:?}.json"));
 
-    let log_path = output_dir.join(format!("vector_upgrade_log_{mode:?}.json"));
-
-    let versions = vec![
+    let versions = [
         ("v0", "tests/vector/data/test_vectors_v0.json"),
         ("v1", "tests/vector/data/test_vectors_v1.json"),
         ("v2", "tests/vector/data/test_vectors_v2.json"),
@@ -100,79 +90,71 @@ fn _run_vector_test(mode: DbMode) {
     let password = "Hello".to_owned();
     let iterations = 5;
 
-    for (version, json_path) in versions {
-        #[cfg(feature = "logging")]
-        info!("Processing {version} ← {json_path}");
+    for (version, path) in versions {
+        let content = fs::read_to_string(path).expect("read vector file");
+        let vectors: Vec<TestVector> = serde_json::from_str(&content).expect("parse vectors");
 
-        let json_content = fs::read_to_string(json_path).expect("read vector file");
-        let vectors: Vec<TestVector> = serde_json::from_str(&json_content).expect("parse vectors");
+        for (idx, vec) in vectors.iter().enumerate() {
+            let ciphertext = hex::decode(&vec.ciphertext_hex).unwrap();
 
-        for (idx, vector) in vectors.iter().enumerate() {
-            let ciphertext = hex::decode(&vector.ciphertext_hex).unwrap();
-
-            let upgraded_v3 = if version != "v3" {
+            let v3_data = if version != "v3" {
                 let buffer = Arc::new(Mutex::new(Vec::new()));
-                let writer = ThreadSafeVec(buffer.clone());
-
-                convert_to_v3(
-                    Cursor::new(&ciphertext),
-                    writer,
-                    &Password::new(password.clone()),
-                    iterations,
-                )
-                .expect("convert to v3 failed");
-
-                let data = buffer.lock().unwrap().clone();
-                data
+                {
+                    let writer = ThreadSafeVec(buffer.clone());
+                    convert_to_v3(
+                        Cursor::new(&ciphertext),
+                        writer,
+                        &Password::new(password.clone()),
+                        iterations,
+                    )
+                    .expect("convert_to_v3");
+                }
+                Arc::try_unwrap(buffer).unwrap().into_inner().unwrap()
             } else {
                 ciphertext
             };
 
-            assert_eq!(&upgraded_v3[0..5], b"AES\x03\x00");
+            assert_eq!(&v3_data[0..5], b"AES\x03\x00");
 
             let mut decrypted = Vec::new();
             decrypt(
-                Cursor::new(&upgraded_v3),
+                Cursor::new(&v3_data),
                 &mut decrypted,
                 &Password::new(password.clone()),
             )
             .unwrap();
-            assert_eq!(decrypted, vector.plaintext.as_bytes());
+            assert_eq!(decrypted, vec.plaintext.as_bytes());
 
-            // Rotate to new random key
-            let fresh_key: FileKey32 = FileKey32::random();
-            let new_password = Password::new(fresh_key.expose_secret().to_hex());
+            let new_key = FileKey32::random();
+            let new_password = Password::new(new_key.expose_secret().to_hex());
 
-            let output_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
-            let mut output = fs::File::create(&output_file).unwrap();
-
+            let out_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
+            let mut f = fs::File::create(&out_file).unwrap();
             encrypt(
-                Cursor::new(vector.plaintext.as_bytes()),
-                &mut output,
+                Cursor::new(vec.plaintext.as_bytes()),
+                &mut f,
                 &new_password,
                 iterations,
             )
             .unwrap();
 
-            // Deterministic file_id for logging
             let mut hasher = Hasher::new();
-            hasher.update(vector.plaintext.as_bytes());
+            hasher.update(vec.plaintext.as_bytes());
             hasher.update(version.as_bytes());
             hasher.update(&idx.to_be_bytes());
             let file_id = hasher.finalize().to_hex().to_string();
 
-            // Insert into appropriate DB
             db.insert_test_file(
                 &format!("{version}_test_{idx:02}.txt"),
-                vector.plaintext.len() as i64,
+                vec.plaintext.len() as i64,
             );
 
             log_entries.push(json!({
                 "version": version,
                 "index": idx,
-                "rotated_file": output_file.file_name().unwrap().to_string_lossy(),
-                "new_password_hex": fresh_key.expose_secret().to_hex(),
-                "file_id_blake3": file_id,
+                "file": out_file.file_name().unwrap().to_string_lossy(),
+                "new_password_hex": new_key.expose_secret().to_hex(),
+                "file_id": file_id,
             }));
         }
     }
@@ -180,16 +162,15 @@ fn _run_vector_test(mode: DbMode) {
     let log = json!({
         "generated_at": Utc::now().to_rfc3339(),
         "mode": format!("{mode:?}"),
-        "total_vectors_processed": log_entries.len(),
-        "entries": log_entries,
+        "total": log_entries.len(),
+        "entries": log_entries
     });
 
-    fs::write(&log_path, serde_json::to_string_pretty(&log).unwrap()).expect("write log");
+    fs::write(&log_path, serde_json::to_string_pretty(&log).unwrap()).unwrap();
 
     #[cfg(feature = "logging")]
     info!(
-        "Vector test completed ({mode:?}) — {} files processed → log: {log_path}",
-        log_entries.len(),
-        log_path = log_path.display()
+        "Vector test complete ({mode:?}) — {} files",
+        log_entries.len()
     );
 }

@@ -9,8 +9,8 @@ use std::fs;
 use tempfile::tempdir;
 
 // Shared test helper — fresh DBs every test
-mod support;
-use support::{DbMode, TestDbPair};
+mod common;
+use common::{DbMode, TestDbPair};
 
 // Use the REAL std::result::Result (two generics) for test functions
 type TestResult<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
