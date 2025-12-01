@@ -14,16 +14,29 @@ use chrono::Utc;
 use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
+
+// Conditional tracing imports
+#[cfg(feature = "logging")]
 use tracing::{debug, info};
 
+#[cfg(feature = "logging")]
+use tracing_subscriber::EnvFilter;
+
 fn init_tracing() {
-    static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| {
-        let _ = tracing_subscriber::fmt()
-            .with_test_writer()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .try_init();
-    });
+    #[cfg(feature = "logging")]
+    {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| {
+            let _ = tracing_subscriber::fmt()
+                .with_test_writer()
+                .with_env_filter(EnvFilter::from_default_env())
+                .try_init();
+        });
+    }
+    #[cfg(not(feature = "logging"))]
+    {
+        // no-op
+    }
 }
 
 #[derive(Clone)]
@@ -48,9 +61,13 @@ struct TestVector {
 #[test]
 fn upgrade_and_rotate_official_test_vectors() {
     init_tracing();
+
+    #[cfg(feature = "logging")]
     info!("Starting official test vector upgrade & rotation test");
 
     let db = TestDbPair::new();
+
+    #[cfg(feature = "logging")]
     info!("Using temporary DBs in {:?}", db.temp_dir());
 
     let output_dir = std::path::Path::new("tests/data/output");
@@ -69,6 +86,7 @@ fn upgrade_and_rotate_official_test_vectors() {
     let password = "Hello".to_owned();
     let iterations = 5;
 
+    #[cfg(feature = "logging")]
     info!(
         "Processing {} vector versions with {} KDF iterations",
         versions.len(),
@@ -76,18 +94,21 @@ fn upgrade_and_rotate_official_test_vectors() {
     );
 
     for (version, json_path) in versions {
+        #[cfg(feature = "logging")]
         info!("Loading {version} — {json_path}");
 
         let json_content = fs::read_to_string(json_path).expect("failed to read test vector file");
         let vectors: Vec<TestVector> =
             serde_json::from_str(&json_content).expect("invalid JSON in test vectors");
 
+        #[cfg(feature = "logging")]
         info!("{version} — {} test vectors loaded", vectors.len());
 
         for (idx, vector) in vectors.iter().enumerate() {
             let ciphertext = hex::decode(&vector.ciphertext_hex).unwrap();
 
             let upgraded_v3 = if version != "v3" {
+                #[cfg(feature = "logging")]
                 debug!("{version} → v3 upgrade: test #{idx}");
                 let buffer = Arc::new(Mutex::new(Vec::new()));
                 let writer = ThreadSafeVec(buffer.clone());
@@ -107,9 +128,11 @@ fn upgrade_and_rotate_official_test_vectors() {
                 };
                 let len_after = data.len();
 
+                #[cfg(feature = "logging")]
                 info!("{version} test {idx:02}: upgraded {len_before} → {len_after} bytes");
                 data
             } else {
+                #[cfg(feature = "logging")]
                 debug!("{version} test {idx:02}: already v3 — skipping upgrade");
                 ciphertext
             };
@@ -131,6 +154,7 @@ fn upgrade_and_rotate_official_test_vectors() {
             let output_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
             let mut output = fs::File::create(&output_file).unwrap();
 
+            #[cfg(feature = "logging")]
             debug!(
                 "{version} test {idx:02}: rotating key → {}",
                 output_file.display()
@@ -164,6 +188,7 @@ fn upgrade_and_rotate_official_test_vectors() {
             }));
         }
 
+        #[cfg(feature = "logging")]
         info!(
             "{version} — All {} vectors processed successfully",
             vectors.len()
@@ -179,9 +204,11 @@ fn upgrade_and_rotate_official_test_vectors() {
     fs::write(&log_path, serde_json::to_string_pretty(&log).unwrap())
         .expect("failed to write vector log");
 
+    #[cfg(feature = "logging")]
     info!(
         "Test vector upgrade + rotation completed — {} files processed",
         log_entries.len()
     );
+    #[cfg(feature = "logging")]
     info!("Log written to {}", log_path.display());
 }

@@ -1,5 +1,5 @@
 // tests/core_tests.rs
-//! Final working test suite — now with professional tracing logs
+//! Final working test suite — professional tracing logs (optional)
 
 use std::fs;
 
@@ -9,11 +9,17 @@ use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use tempfile::tempdir;
 
-// Import tracing macros
+// Conditional tracing imports
+#[cfg(feature = "logging")]
 use tracing::{debug, info};
 
-// Our core crate
+#[cfg(feature = "logging")]
+use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+// Bring the secure conversion trait into scope unconditionally
+// This is required for .to_hex() on FileKey32 secrets
 use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt};
+
 use encrypted_file_vault::consts::{
     AESCRYPT_V3_HEADER, DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX,
 };
@@ -21,14 +27,19 @@ use encrypted_file_vault::core::*;
 use encrypted_file_vault::error::CoreError;
 use encrypted_file_vault::{index, vault};
 
-// Initialize tracing once per test binary
+/// Initialize tracing only when logging feature is enabled
 fn init_tracing() {
-    use tracing_subscriber::{fmt, prelude::*, EnvFilter};
-
-    let _ = tracing_subscriber::registry()
-        .with(fmt::layer().with_test_writer())
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
-        .try_init();
+    #[cfg(feature = "logging")]
+    {
+        let _ = tracing_subscriber::registry()
+            .with(fmt::layer().with_test_writer())
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+            .try_init();
+    }
+    #[cfg(not(feature = "logging"))]
+    {
+        // no-op
+    }
 }
 
 #[test]
@@ -37,12 +48,17 @@ fn test_generate_key_is_random_and_32_bytes() {
     let key1 = generate_key();
     let key2 = generate_key();
     assert_eq!(key1.expose_secret().len(), 32);
-    assert_ne!(key1.expose_secret(), key2.expose_secret());
+    assert_ne!(
+        key1.expose_secret().as_slice(),
+        key2.expose_secret().as_slice()
+    );
 }
 
 #[test]
 fn test_blake3_hex_is_64_chars_lowercase() {
     init_tracing();
+
+    #[cfg(feature = "logging")]
     info!("Running blake3_hex test — fast but involves hashing");
 
     let hex = blake3_hex(b"hello world");
@@ -55,6 +71,7 @@ fn test_blake3_hex_is_64_chars_lowercase() {
 #[test]
 fn test_encrypt_decrypt_roundtrip_in_memory() {
     init_tracing();
+
     let plaintext = b"Attack at dawn!";
     let key = generate_key();
     let password = Password::new(key.expose_secret().to_hex());
@@ -80,6 +97,8 @@ fn test_encrypt_to_vec_produces_v3_header() {
 #[test]
 fn test_is_aescrypt_file_and_version() {
     init_tracing();
+
+    #[cfg(feature = "logging")]
     info!("[fast] Verifying AES-Crypt file magic detection and version parsing");
 
     let ciphertext = encrypt_to_vec(
@@ -87,6 +106,7 @@ fn test_is_aescrypt_file_and_version() {
         &Password::new(generate_key().expose_secret().to_hex()),
     )
     .unwrap();
+
     assert!(is_aescrypt_file(&ciphertext));
     assert_eq!(aescrypt_version(&ciphertext), Some(3));
 
@@ -117,24 +137,35 @@ fn test_ensure_v3_passes_through_v3_unchanged() {
 #[test]
 fn test_rotate_key_produces_different_ciphertext_and_new_key() {
     init_tracing();
+
+    #[cfg(feature = "logging")]
     info!("Starting key rotation test — this one can be slow");
 
     let plaintext = b"secret message";
     let old_key = generate_key();
+
+    #[cfg(feature = "logging")]
     debug!("Generated old key: {}", old_key.expose_secret().to_hex());
 
     let old_password = Password::new(old_key.expose_secret().to_hex());
     let original = encrypt_to_vec(plaintext, &old_password).unwrap();
 
+    #[cfg(feature = "logging")]
     info!("Encrypting with old key...");
+
     let (new_ciphertext, new_key) = rotate_key(&original, &old_password).unwrap();
 
+    #[cfg(feature = "logging")]
     info!(
         "Successfully rotated to new key: {}",
         new_key.expose_secret().to_hex()
     );
+
     assert_ne!(original, new_ciphertext);
-    assert_ne!(old_key.expose_secret(), new_key.expose_secret());
+    assert_ne!(
+        old_key.expose_secret().as_slice(),
+        new_key.expose_secret().as_slice()
+    );
 
     let decrypted = decrypt_to_vec(
         &new_ciphertext,
@@ -143,12 +174,14 @@ fn test_rotate_key_produces_different_ciphertext_and_new_key() {
     .unwrap();
     assert_eq!(plaintext.as_slice(), decrypted.as_slice());
 
+    #[cfg(feature = "logging")]
     info!("Key rotation test completed successfully");
 }
 
 #[test]
 fn test_encrypt_file_and_decrypt_file_roundtrip() {
     init_tracing();
+
     let dir = tempdir().unwrap();
     let plain = dir.path().join("plain.txt");
     let enc = dir.path().join("secret.aes");
@@ -168,12 +201,16 @@ fn test_encrypt_file_and_decrypt_file_roundtrip() {
 #[test]
 fn test_add_file_creates_valid_entry_and_stores_key() {
     init_tracing();
-    info!("[SLOW] test_add_file_creates_valid_entry_and_stores_key — this test performs:");
-    info!("       • Real file I/O (write fake pdf)");
-    info!("       • Full AES-Crypt v3 encryption with 600_000 KDF iterations");
-    info!("       • Two SQLCipher DB writes (vault + index)");
-    info!("       • Expected runtime: 30–90 seconds on normal hardware");
-    info!("       → This is intentional and correct!");
+
+    #[cfg(feature = "logging")]
+    {
+        info!("[SLOW] test_add_file_creates_valid_entry_and_stores_key — this test performs:");
+        info!("       • Real file I/O (write fake pdf)");
+        info!("       • Full AES-Crypt v3 encryption with 600_000 KDF iterations");
+        info!("       • Two SQLCipher DB writes (vault + index)");
+        info!("       • Expected runtime: 30–90 seconds on normal hardware");
+        info!("       → This is intentional and correct!");
+    }
 
     let dir = tempdir().unwrap();
     let plain_path = dir.path().join("doc.pdf");
@@ -207,19 +244,20 @@ fn test_add_file_creates_valid_entry_and_stores_key() {
     decrypt(
         std::io::Cursor::new(fs::read(&enc_path).unwrap()),
         &mut output,
-        &Password::new(hex::encode(stored)),
+        &Password::new(hex::encode(&stored)),
     )
     .unwrap();
     assert_eq!(output, b"fake pdf content");
 
+    #[cfg(feature = "logging")]
     info!("[SLOW] test_add_file_creates_valid_entry_and_stores_key completed successfully");
 }
 
 #[test]
 fn test_password_representations_are_correct_and_consistent() {
     init_tracing();
-    let key = FileKey32::new([0x42; 32]);
 
+    let key = FileKey32::new([0x42; 32]);
     let repr = password_representations(&key);
 
     assert_eq!(
@@ -239,6 +277,7 @@ fn test_password_representations_are_correct_and_consistent() {
 #[test]
 fn test_store_and_retrieve_key_blob_via_db() {
     init_tracing();
+
     let _dir = tempdir().unwrap();
     std::env::set_var("EFV_VAULT_KEY", "test");
 
@@ -256,12 +295,13 @@ fn test_store_and_retrieve_key_blob_via_db() {
         )
         .unwrap();
 
-    assert_eq!(retrieved, key.expose_secret());
+    assert_eq!(retrieved, key.expose_secret().as_slice());
 }
 
 #[test]
 fn test_add_file_uses_defaults_when_options_none() {
     init_tracing();
+
     let dir = tempdir().unwrap();
     let plain = dir.path().join("note.txt");
     fs::write(&plain, b"hello").unwrap();
@@ -289,6 +329,7 @@ fn test_add_file_uses_defaults_when_options_none() {
 #[test]
 fn test_decrypt_fails_with_wrong_password() {
     init_tracing();
+
     let plaintext = b"secret";
     let key1 = generate_key();
     let key2 = generate_key();

@@ -8,16 +8,29 @@ use rusqlite::{params, Connection};
 use std::env;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
+
+// Conditional tracing imports
+#[cfg(feature = "logging")]
 use tracing::{debug, info};
 
+#[cfg(feature = "logging")]
+use tracing_subscriber::EnvFilter;
+
 pub fn init_test_logging() {
-    static INIT: std::sync::Once = std::sync::Once::new();
-    INIT.call_once(|| {
-        let _ = tracing_subscriber::fmt()
-            .with_test_writer()
-            .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-            .try_init();
-    });
+    #[cfg(feature = "logging")]
+    {
+        static INIT: std::sync::Once = std::sync::Once::new();
+        INIT.call_once(|| {
+            let _ = tracing_subscriber::fmt()
+                .with_test_writer()
+                .with_env_filter(EnvFilter::from_default_env())
+                .try_init();
+        });
+    }
+    #[cfg(not(feature = "logging"))]
+    {
+        // no-op
+    }
 }
 
 pub struct TestDbPair {
@@ -57,6 +70,7 @@ impl Drop for EnvGuard {
         } else {
             env::remove_var("EFV_INDEX_KEY");
         }
+        #[cfg(feature = "logging")]
         debug!("TestDbPair dropped — original environment restored");
     }
 }
@@ -70,6 +84,7 @@ impl TestDbPair {
     /// PERSISTENT DBs — kept across test runs in ./test_persistent_dbs/
     #[allow(dead_code)]
     pub fn persistent() -> Self {
+        #[cfg(feature = "logging")]
         info!("PERSISTENT TestDbPair — using ./test_persistent_dbs/");
         Self::new_internal(false)
     }
@@ -79,11 +94,13 @@ impl TestDbPair {
 
         let (temp_dir, persistent_path) = if ephemeral {
             let temp = TempDir::new().expect("Failed to create temp dir");
+            #[cfg(feature = "logging")]
             info!("Created ephemeral test directory: {:?}", temp.path());
             (Some(temp), None)
         } else {
             let path = PathBuf::from("./test_persistent_dbs");
             std::fs::create_dir_all(&path).ok();
+            #[cfg(feature = "logging")]
             info!("Using persistent test directory: {:?}", path);
             (None, Some(path))
         };
@@ -103,6 +120,7 @@ impl TestDbPair {
         env::set_var("EFV_VAULT_KEY", "test-vault-secret-123");
         env::set_var("EFV_INDEX_KEY", "test-index-secret-456");
 
+        #[cfg(feature = "logging")]
         debug!("Environment overridden for test isolation");
 
         let env_guard = EnvGuard {
@@ -118,11 +136,14 @@ impl TestDbPair {
         if ephemeral {
             vault.execute("DELETE FROM keys;", params![]).unwrap();
             index.execute("DELETE FROM files;", params![]).unwrap();
+            #[cfg(feature = "logging")]
             debug!("Cleared existing data from vault and index databases");
         } else {
+            #[cfg(feature = "logging")]
             info!("Persistent mode — keeping existing data in ./test_persistent_dbs/");
         }
 
+        #[cfg(feature = "logging")]
         info!(
             "TestDbPair ready — {} mode",
             if ephemeral { "ephemeral" } else { "PERSISTENT" }
@@ -161,8 +182,11 @@ pub fn insert_test_file(
     let key = FileKey32::random();
     let file_id = blake3::hash(key.expose_secret()).to_hex().to_string();
 
+    #[cfg(feature = "logging")]
     debug!("Inserting test file: \"{display_name}\" (size: {plaintext_size} bytes)");
+    #[cfg(feature = "logging")]
     debug!("Generated file key: {}", key.expose_secret().to_hex());
+    #[cfg(feature = "logging")]
     debug!("Derived file_id: {file_id}");
 
     db.vault
@@ -192,6 +216,7 @@ pub fn insert_test_file(
         )
         .expect("failed to insert file metadata");
 
+    #[cfg(feature = "logging")]
     info!("Test file inserted — file_id = {file_id}");
 
     (file_id, key)

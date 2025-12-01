@@ -55,16 +55,23 @@ tempfile = "3.23"
 # ──────────────────────────────────────────────────────────────
 [features]
 default = [
-  # Core encryption backend — cannot be disabled
-  # (aescrypt-rs has no features, but we list it here for explicit intent)
-  # "aescrypt-rs",  # ← not needed technically, but kept as documentation
-
-  "rusqlite/bundled-sqlcipher-vendored-openssl", # encrypted vault storage
-  "secure-gate/zeroize",                         # memory zeroing
-  "secure-gate/rand",                            # secure RNG
-  "secure-gate/conversions",                     # safe key conversions
+  "rusqlite/bundled-sqlcipher-vendored-openssl",
+  "secure-gate/zeroize",
+  "secure-gate/rand",
+  "secure-gate/conversions",
 ]
+cli = [
+  "dep:anyhow",
+  "dep:rpassword",
+  "dep:walkdir",
+  "dep:tracing",
+  "dep:tracing-subscriber",
+  "dep:env_logger",
+  "dep:log",
+]
+logging = ["dep:log", "dep:env_logger", "dep:tracing", "dep:tracing-subscriber"]
 
-# Future optional feature groups
-# cli = ["dep:anyhow", "dep:rpassword", "dep:walkdir", "dep:tracing", "dep:tracing-subscriber", "dep:env_logger", "dep:log"]
-# logging = ["dep:log", "dep:env_logger", "dep:tracing", "dep:tracing-subscriber"]
+[[bin]]
+name = "decrypt_batch"
+path = "src/bin/decrypt_batch.rs"
+required-features = ["cli"]
