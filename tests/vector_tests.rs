@@ -12,7 +12,7 @@ use aescrypt_rs::{decrypt, encrypt};
 use blake3::Hasher;
 use chrono::Utc;
 use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize}; // <-- THIS WAS MISSING!
 use serde_json::json;
 
 // Conditional tracing imports
@@ -32,10 +32,6 @@ fn init_tracing() {
                 .with_env_filter(EnvFilter::from_default_env())
                 .try_init();
         });
-    }
-    #[cfg(not(feature = "logging"))]
-    {
-        // no-op
     }
 }
 
@@ -68,7 +64,7 @@ fn upgrade_and_rotate_official_test_vectors() {
     let db = TestDbPair::new();
 
     #[cfg(feature = "logging")]
-    info!("Using temporary DBs in {:?}", db.temp_dir());
+    info!("Using temporary DBs in {:?}", db.path());
 
     let output_dir = std::path::Path::new("tests/data/output");
     let _ = fs::remove_dir_all(output_dir);
@@ -109,27 +105,30 @@ fn upgrade_and_rotate_official_test_vectors() {
 
             let upgraded_v3 = if version != "v3" {
                 #[cfg(feature = "logging")]
-                debug!("{version} → v3 upgrade: test #{idx}");
+                debug!("{version} to v3 upgrade: test #{idx}");
+
                 let buffer = Arc::new(Mutex::new(Vec::new()));
                 let writer = ThreadSafeVec(buffer.clone());
 
                 convert_to_v3(
                     Cursor::new(&ciphertext),
-                    writer, // ← FIXED: removed the stray comma
+                    writer,
                     &Password::new(password.clone()),
                     iterations,
                 )
-                .expect("v0/v1/v2 → v3 conversion failed");
+                .expect("v0/v1/v2 to v3 conversion failed");
 
-                let _len_before = ciphertext.len();
                 let data = {
                     let mut guard = buffer.lock().unwrap();
                     std::mem::take(&mut *guard)
                 };
-                let _len_after = data.len();
 
                 #[cfg(feature = "logging")]
-                info!("{version} test {idx:02}: upgraded {_len_before} → {_len_after} bytes");
+                info!(
+                    "{version} test {idx:02}: upgraded {} to {} bytes",
+                    ciphertext.len(),
+                    data.len()
+                );
                 data
             } else {
                 #[cfg(feature = "logging")]
@@ -156,9 +155,10 @@ fn upgrade_and_rotate_official_test_vectors() {
 
             #[cfg(feature = "logging")]
             debug!(
-                "{version} test {idx:02}: rotating key → {}",
+                "{version} test {idx:02}: rotating key to {}",
                 output_file.display()
             );
+
             encrypt(
                 Cursor::new(vector.plaintext.as_bytes()),
                 &mut output,
