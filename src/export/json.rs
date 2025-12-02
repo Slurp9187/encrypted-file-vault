@@ -1,10 +1,14 @@
-// src/export.rs
+// src/export/json.rs
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
 use chrono::Utc;
+use secure_gate::dynamic_alias;
 use serde_json::json;
 use std::error::Error;
 
-use crate::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
+use crate::db::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
+
+// Your alias — perfect
+dynamic_alias!(PasswordBlob, Vec<u8>);
 
 /// Export all file metadata + passwords to a portable JSON file using Base64URL encoding.
 ///
@@ -66,14 +70,18 @@ pub fn export_to_json(path: &str) -> Result<(), Box<dyn Error>> {
             id_length,
         ) = row?;
 
-        // Fetch the raw 32-byte password from the vault
-        let password_blob: Vec<u8> = vault_conn.query_row(
+        // Fetch raw BLOB → convert directly into your secure-gate alias
+        let password_blob: PasswordBlob = vault_conn.query_row(
             "SELECT password_blob FROM keys WHERE file_id = ?1",
             [&file_id],
-            |r| r.get(0),
+            |r| {
+                let raw: Vec<u8> = r.get(0)?;
+                Ok(PasswordBlob::new(raw)) // ← wraps and zeroizes on drop
+            },
         )?;
 
-        let password_b64 = URL_SAFE_NO_PAD.encode(&password_blob);
+        // expose_secret() works because ExposeSecret is in scope
+        let password_b64 = URL_SAFE_NO_PAD.encode(password_blob.expose_secret());
 
         files.push(json!({
             "file_id": file_id,
