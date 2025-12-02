@@ -12,6 +12,7 @@ pub mod config;
 pub mod consts;
 pub mod core;
 pub mod db;
+pub mod enums;
 pub mod export;
 pub mod legacy;
 pub mod rotation;
