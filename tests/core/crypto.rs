@@ -2,6 +2,7 @@
 use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::consts::AESCRYPT_V3_HEADER;
 use encrypted_file_vault::core::*;
+use encrypted_file_vault::crypto::*;
 use encrypted_file_vault::error::CoreError;
 use encrypted_file_vault::SecureConversionsExt;
 

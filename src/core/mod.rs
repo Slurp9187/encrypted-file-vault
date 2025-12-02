@@ -1,10 +1,8 @@
 // src/core/mod.rs
-pub mod crypto;
 pub mod file;
 pub mod key;
 pub mod util;
 
-pub use crypto::*;
 pub use file::*;
 pub use key::*;
 pub use util::*;

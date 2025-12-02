@@ -11,6 +11,7 @@ pub mod aliases;
 pub mod config;
 pub mod consts;
 pub mod core;
+pub mod crypto;
 pub mod db;
 pub mod enums;
 pub mod export;
