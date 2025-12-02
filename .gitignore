@@ -5,7 +5,7 @@ Cargo.lock
 dev-config.toml
 code_packages/
 scripts/gen_data.py
-tests/data
+tests/data_output
 tests/vector/data/aes_test_files
 tests/vector/data/scripts
 tests/**/*.db

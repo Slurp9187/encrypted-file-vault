@@ -26,12 +26,12 @@ pub struct TestDbPair {
 
 impl TestDbPair {
     pub fn new(mode: DbMode) -> Self {
-        let base = PathBuf::from("tests/data");
+        let base = PathBuf::from("tests/data_output");
 
         if mode == DbMode::Fresh {
             let _ = fs::remove_dir_all(&base);
         }
-        fs::create_dir_all(&base).expect("create tests/data");
+        fs::create_dir_all(&base).expect("create tests/data_output");
 
         let (subdir, index_name, vault_name) = match mode {
             DbMode::Fresh => ("db_fresh", "index.db", "vault.db"),

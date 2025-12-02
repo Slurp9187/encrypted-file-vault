@@ -13,8 +13,8 @@ pub fn default_keys() -> Keys {
 
 pub fn default_paths() -> Paths {
     Paths {
-        vault_db: "tests/data/vault.db".into(),
-        index_db: "tests/data/index.db".into(),
+        vault_db: "tests/data_output/vault.db".into(),
+        index_db: "tests/data_output/index.db".into(),
     }
 }
 
