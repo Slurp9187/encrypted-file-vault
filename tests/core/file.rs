@@ -1,6 +1,6 @@
 // tests/core/file.rs
 use encrypted_file_vault::aliases::FilePassword;
-use encrypted_file_vault::core::{decrypt_file, encrypt_file};
+use encrypted_file_vault::file_ops::{decrypt_file, encrypt_file};
 use encrypted_file_vault::key_ops::generate_key;
 use encrypted_file_vault::SecureConversionsExt;
 use std::fs;

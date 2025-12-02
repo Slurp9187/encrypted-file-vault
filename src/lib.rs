@@ -10,11 +10,11 @@
 pub mod aliases;
 pub mod config;
 pub mod consts;
-pub mod core;
 pub mod crypto;
 pub mod db;
 pub mod enums;
 pub mod export;
+pub mod file_ops;
 pub mod key_ops;
 pub mod legacy;
 pub mod rotation;
@@ -41,3 +41,5 @@ pub use key_ops::PasswordRepr;
 // pub use key_ops::Result as CoreResult;
 
 pub use db::{index_db_conn, index_db_ops, vault_db_conn, vault_db_ops};
+
+pub type Result<T> = std::result::Result<T, crate::error::CoreError>;

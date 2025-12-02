@@ -7,12 +7,9 @@
 
 use std::path::Path;
 
-// use crate::consts::AESCRYPT_V3_HEADER;
-use crate::crypto::{decrypt_to_vec, encrypt_to_vec};
-// use crate::error::CoreError;
-use crate::core::Result; // Use the crate's public Result alias
-
 use crate::aliases::FilePassword;
+use crate::crypto::{decrypt_to_vec, encrypt_to_vec};
+use crate::Result;
 
 /// Encrypt a file on disk using AES-Crypt v3
 pub fn encrypt_file<P: AsRef<Path>>(

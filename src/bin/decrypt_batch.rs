@@ -3,7 +3,8 @@
 
 use anyhow::{Context, Result};
 use encrypted_file_vault::aliases::FilePassword;
-use encrypted_file_vault::{core::decrypt_file, index_db_conn::open_index_db};
+use encrypted_file_vault::file_ops::decrypt_file;
+use encrypted_file_vault::index_db_conn::open_index_db;
 use rpassword::read_password;
 use rusqlite::params;
 use std::io::Write;
