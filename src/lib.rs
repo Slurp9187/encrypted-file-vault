@@ -12,9 +12,9 @@ pub mod config;
 pub mod consts;
 pub mod core;
 pub mod export;
-pub mod index;
+pub mod index_db_conn;
 pub mod rotate_keys;
-pub mod vault;
+pub mod vault_db_conn;
 
 // Only ONE `mod error` — this is the correct one
 pub mod error;

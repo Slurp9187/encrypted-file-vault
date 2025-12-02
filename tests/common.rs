@@ -6,7 +6,7 @@
 pub mod db {
     use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
     use encrypted_file_vault::core::store_key_blob;
-    use encrypted_file_vault::{index::open_index_db, vault::open_vault_db};
+    use encrypted_file_vault::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
     use rusqlite::{params, Connection};
     use std::env;
     use std::fs;

@@ -3,7 +3,7 @@
 
 use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::core::*;
-use encrypted_file_vault::vault;
+use encrypted_file_vault::vault_db_conn;
 use rusqlite::params;
 use std::fs;
 use tempfile::tempdir;
@@ -151,7 +151,7 @@ fn test_history_backfill_on_existing_keys() -> TestResult {
 
     // Re-open → backfill runs
     drop(db.vault);
-    let vault_conn = vault::open_vault_db()?;
+    let vault_conn = vault_db_conn::open_vault_db()?;
     let file_id = "backfill_test";
 
     let (version, superseded_at): (i64, Option<String>) = vault_conn.query_row(

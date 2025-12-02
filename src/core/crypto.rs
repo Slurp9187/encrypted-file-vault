@@ -12,7 +12,6 @@ use aescrypt_rs::{convert::convert_to_v3, decrypt, encrypt};
 
 use crate::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 use crate::consts::{AESCRYPT_V3_HEADER, RANDOM_KEY_KDF_ITERATIONS};
-// use crate::consts::FILE_KDF_ITERATIONS;
 use crate::error::CoreError;
 
 pub type Result<T> = std::result::Result<T, CoreError>;

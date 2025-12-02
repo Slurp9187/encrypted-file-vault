@@ -4,15 +4,15 @@ use chrono::Utc;
 use serde_json::json;
 use std::error::Error;
 
-use crate::{index::open_index_db, vault::open_vault_db};
+use crate::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
 
 /// Export all file metadata + passwords to a portable JSON file using Base64URL encoding.
 ///
 /// SECURITY WARNING: This file contains every password in cleartext.
 /// Protect it like nuclear launch codes.
 pub fn export_to_json(path: &str) -> Result<(), Box<dyn Error>> {
-    let vault_conn = open_vault_db()?;
     let index_conn = open_index_db()?;
+    let vault_conn = open_vault_db()?;
 
     let mut stmt = index_conn.prepare(
         r#"

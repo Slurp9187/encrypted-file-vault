@@ -14,7 +14,7 @@ use crate::aliases::SecureConversionsExt;
 use crate::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
 use crate::core::crypto::rotate_key;
 use crate::core::file::encrypt_file;
-use crate::core::index::{store_file_entry, FileEntry};
+use crate::core::index_db_ops::{store_file_entry, FileEntry};
 use crate::core::key::{generate_key, Key};
 use crate::core::util::blake3_hex;
 use crate::error::CoreError;
