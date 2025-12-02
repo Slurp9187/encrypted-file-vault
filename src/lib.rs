@@ -13,9 +13,11 @@ pub mod consts;
 pub mod core;
 pub mod export;
 pub mod index_db_conn;
+pub mod index_db_ops;
 pub mod legacy;
 pub mod rotation;
 pub mod vault_db_conn;
+pub mod vault_db_ops;
 
 // Optional: flatter access (recommended)
 pub use legacy::upgrade::upgrade_from_legacy;
@@ -27,8 +29,10 @@ pub mod error;
 // Re-export everything users need at the crate root
 pub use aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 pub use config::load as load_config;
-// pub use core::decrypt_file;
-// pub use core::encrypt_file;
-pub use core::{add_file, FileEntry, PasswordRepr, Result as CoreResult};
+
+pub use index_db_ops::FileEntry;
+pub use vault_db_ops::add_file;
+
+pub use core::{PasswordRepr, Result as CoreResult};
 pub use error::CoreError;
 pub use export::export_to_json;
