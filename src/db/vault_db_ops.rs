@@ -12,7 +12,7 @@ use rusqlite::{params, Connection};
 
 use crate::aliases::SecureConversionsExt;
 use crate::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
-use crate::core::file::encrypt_file;
+use crate::core::file_ops::encrypt_file;
 use crate::core::Result;
 use crate::crypto::rotate_key;
 use crate::db::index_db_ops::{store_file_entry, FileEntry};
