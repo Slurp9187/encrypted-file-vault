@@ -11,13 +11,10 @@ pub mod aliases;
 pub mod config;
 pub mod consts;
 pub mod core;
+pub mod db;
 pub mod export;
-pub mod index_db_conn;
-pub mod index_db_ops;
 pub mod legacy;
 pub mod rotation;
-pub mod vault_db_conn;
-pub mod vault_db_ops;
 
 // Optional: flatter access (recommended)
 pub use legacy::upgrade::upgrade_from_legacy;
@@ -30,9 +27,11 @@ pub mod error;
 pub use aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
 pub use config::load as load_config;
 
-pub use index_db_ops::FileEntry;
-pub use vault_db_ops::add_file;
+pub use db::index_db_ops::FileEntry;
+pub use db::vault_db_ops::add_file;
 
 pub use core::{PasswordRepr, Result as CoreResult};
 pub use error::CoreError;
 pub use export::export_to_json;
+
+pub use db::{index_db_conn, index_db_ops, vault_db_conn, vault_db_ops};

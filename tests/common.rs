@@ -5,7 +5,7 @@
 
 pub mod db {
     use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
-    use encrypted_file_vault::core::store_key_blob;
+    use encrypted_file_vault::vault_db_ops::store_key_blob;
     use encrypted_file_vault::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
     use rusqlite::{params, Connection};
     use std::env;
@@ -45,11 +45,13 @@ pub mod db {
             let index_path = subdir_path.join(index_name);
             let vault_path = subdir_path.join(vault_name);
 
-            env::set_var("EFV_TEST_MODE", "1");
-            env::set_var("EFV_VAULT_DB", vault_path.to_str().unwrap());
-            env::set_var("EFV_INDEX_DB", index_path.to_str().unwrap());
-            env::set_var("EFV_VAULT_KEY", "test-vault-secret-2025");
-            env::set_var("EFV_INDEX_KEY", "test-index-secret-2025");
+            unsafe {
+                env::set_var("EFV_TEST_MODE", "1");
+                env::set_var("EFV_VAULT_DB", &vault_path);
+                env::set_var("EFV_INDEX_DB", &index_path);
+                env::set_var("EFV_VAULT_KEY", "test-vault-secret-2025");
+                env::set_var("EFV_INDEX_KEY", "test-index-secret-2025");
+            }
 
             let vault = open_vault_db().expect("open vault db");
             let index = open_index_db().expect("open index db");
