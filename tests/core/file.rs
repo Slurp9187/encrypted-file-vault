@@ -1,6 +1,7 @@
 // tests/core/file.rs
 use encrypted_file_vault::aliases::FilePassword;
-use encrypted_file_vault::core::{decrypt_file, encrypt_file, generate_key};
+use encrypted_file_vault::core::{decrypt_file, encrypt_file};
+use encrypted_file_vault::key_ops::generate_key;
 use encrypted_file_vault::SecureConversionsExt;
 use std::fs;
 use tempfile::tempdir; // This is the missing line!

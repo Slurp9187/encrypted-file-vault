@@ -1,6 +1,6 @@
 // tests/core/key.rs
 use encrypted_file_vault::aliases::FileKey32;
-use encrypted_file_vault::core::{generate_key, password_representations};
+use encrypted_file_vault::key_ops::{generate_key, password_representations};
 
 #[test]
 fn test_generate_key_is_random_and_32_bytes() {

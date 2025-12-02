@@ -13,12 +13,12 @@ use rusqlite::{params, Connection};
 use crate::aliases::SecureConversionsExt;
 use crate::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
 use crate::core::file::encrypt_file;
-use crate::core::key_ops::{generate_key, Key};
+use crate::core::Result;
 use crate::crypto::rotate_key;
 use crate::db::index_db_ops::{store_file_entry, FileEntry};
 use crate::error::CoreError;
+use crate::key_ops::{generate_key, Key};
 use crate::util::blake3_hex;
-use crate::CoreResult as Result;
 
 /// Store a new key blob into key_history (triggers keep keys table in sync)
 pub fn store_key_blob(conn: &mut Connection, file_id: &str, key: &Key) -> rusqlite::Result<()> {

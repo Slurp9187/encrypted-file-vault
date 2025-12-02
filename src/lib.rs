@@ -15,6 +15,7 @@ pub mod crypto;
 pub mod db;
 pub mod enums;
 pub mod export;
+pub mod key_ops;
 pub mod legacy;
 pub mod rotation;
 pub mod util;
@@ -33,8 +34,10 @@ pub use config::load as load_config;
 pub use db::index_db_ops::FileEntry;
 pub use db::vault_db_ops::add_file;
 
-pub use core::{PasswordRepr, Result as CoreResult};
+// pub use core::{PasswordRepr, Result as CoreResult};
 pub use error::CoreError;
 pub use export::export_to_json;
+pub use key_ops::PasswordRepr;
+// pub use key_ops::Result as CoreResult;
 
 pub use db::{index_db_conn, index_db_ops, vault_db_conn, vault_db_ops};

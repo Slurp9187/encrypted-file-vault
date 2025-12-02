@@ -5,12 +5,14 @@ use aescrypt_rs::decrypt;
 use encrypted_file_vault::add_file;
 use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
-use encrypted_file_vault::core::*;
+use encrypted_file_vault::key_ops::generate_key;
 use encrypted_file_vault::vault_db_ops::store_key_blob;
+use serial_test::serial;
 use std::fs;
 use tempfile::tempdir;
 
 #[test]
+#[serial]
 fn test_add_file_creates_valid_entry_and_stores_key() {
     let mut db = TestDbPair::new(DbMode::Fresh);
 
@@ -48,6 +50,7 @@ fn test_add_file_creates_valid_entry_and_stores_key() {
 }
 
 #[test]
+#[serial]
 fn test_store_and_retrieve_key_blob_via_db() {
     let mut db = TestDbPair::new(DbMode::Fresh);
 
@@ -69,6 +72,7 @@ fn test_store_and_retrieve_key_blob_via_db() {
 }
 
 #[test]
+#[serial]
 fn test_add_file_uses_defaults_when_options_none() {
     let mut db = TestDbPair::new(DbMode::Fresh);
 

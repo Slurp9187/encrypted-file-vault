@@ -4,6 +4,7 @@ use encrypted_file_vault::consts::AESCRYPT_V3_HEADER;
 use encrypted_file_vault::core::*;
 use encrypted_file_vault::crypto::*;
 use encrypted_file_vault::error::CoreError;
+use encrypted_file_vault::key_ops::generate_key;
 use encrypted_file_vault::SecureConversionsExt;
 
 #[test]

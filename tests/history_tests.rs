@@ -3,7 +3,7 @@
 
 use encrypted_file_vault::add_file;
 use encrypted_file_vault::aliases::FilePassword;
-use encrypted_file_vault::core::*;
+use encrypted_file_vault::key_ops::generate_key;
 use encrypted_file_vault::vault_db_conn;
 use encrypted_file_vault::vault_db_ops::rotate_key_in_vault;
 use encrypted_file_vault::vault_db_ops::store_key_blob;

@@ -10,7 +10,7 @@ use std::path::Path;
 // use crate::consts::AESCRYPT_V3_HEADER;
 use crate::crypto::{decrypt_to_vec, encrypt_to_vec};
 // use crate::error::CoreError;
-use crate::CoreResult as Result; // Use the crate's public Result alias
+use crate::core::Result; // Use the crate's public Result alias
 
 use crate::aliases::FilePassword;
 
