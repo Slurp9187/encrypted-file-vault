@@ -1,7 +1,8 @@
 // tests/core/vault_workflow.rs
-use crate::common::DbMode;
-use crate::common::TestDbPair;
+mod common;
 use aescrypt_rs::decrypt;
+use common::DbMode;
+use common::TestDbPair;
 use encrypted_file_vault::add_file;
 use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
