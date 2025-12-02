@@ -81,10 +81,10 @@ fn _run_vector_test(mode: DbMode) {
     let log_path = output_dir.join(format!("vector_log_{mode:?}.json"));
 
     let versions = [
-        ("v0", "tests/vector/data/test_vectors_v0.json"),
-        ("v1", "tests/vector/data/test_vectors_v1.json"),
-        ("v2", "tests/vector/data/test_vectors_v2.json"),
-        ("v3", "tests/vector/data/test_vectors_v3.json"),
+        ("v0", "tests/data_input/test_vectors_v0.json"),
+        ("v1", "tests/data_input/test_vectors_v1.json"),
+        ("v2", "tests/data_input/test_vectors_v2.json"),
+        ("v3", "tests/data_input/test_vectors_v3.json"),
     ];
 
     let mut log_entries = Vec::new();

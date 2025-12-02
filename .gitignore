@@ -6,7 +6,7 @@ dev-config.toml
 code_packages/
 scripts/gen_data.py
 tests/data_output
-tests/vector/data/aes_test_files
-tests/vector/data/scripts
+tests/data_input/aes_test_files
+tests/data_input/scripts
 tests/**/*.db
 tests/**/*.sqbpro
