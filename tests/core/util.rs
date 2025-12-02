@@ -1,5 +1,5 @@
 // tests/core/util.rs
-use encrypted_file_vault::core::blake3_hex;
+use encrypted_file_vault::util::blake3_hex;
 
 #[test]
 fn test_blake3_hex_is_64_chars_lowercase() {

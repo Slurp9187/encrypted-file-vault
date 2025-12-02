@@ -17,6 +17,7 @@ pub mod enums;
 pub mod export;
 pub mod legacy;
 pub mod rotation;
+pub mod util;
 
 // Optional: flatter access (recommended)
 pub use legacy::upgrade::upgrade_from_legacy;
