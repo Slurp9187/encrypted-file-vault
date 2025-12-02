@@ -8,6 +8,6 @@ pub use json::export_to_json;
 // pub use csv::export_to_csv;         // Future
 // pub use bitwarden::export_bitwarden; // Future
 
-mod json;
+pub mod json;
 // mod csv;          // Future
 // mod bitwarden;    // Future

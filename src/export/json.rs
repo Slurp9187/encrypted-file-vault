@@ -101,7 +101,7 @@ pub fn export_to_json(path: &str) -> Result<(), Box<dyn Error>> {
 
     let export = json!({
         "export_format": "encrypted-file-vault-v1",
-        "exported_at": Utc::now().to_rfc3339(),
+        "exported_at": Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true),
         "exporter_version": env!("CARGO_PKG_VERSION"),
         "total_files": files.len(),
         "warning": "THIS FILE CONTAINS ALL PASSWORDS IN PLAINTEXT. ENCRYPT OR DELETE IMMEDIATELY AFTER USE.",

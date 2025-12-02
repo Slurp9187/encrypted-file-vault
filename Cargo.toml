@@ -31,7 +31,12 @@ toml = "0.9"
 rusqlite = { version = "0.37", features = [
   "bundled-sqlcipher-vendored-openssl",
 ], default-features = false }
-secure-gate = { version = "0.5", features = ["zeroize", "rand", "conversions"] }
+secure-gate = { version = "0.5", features = [
+  "zeroize",
+  "rand",
+  "conversions",
+  "serde",
+] }
 
 # ──────────────────────────────────────────────────────────────
 # Optional / future CLI & logging dependencies
@@ -49,6 +54,7 @@ walkdir = { version = "2.5", optional = true }
 
 [dev-dependencies]
 tempfile = "3.23"
+serial_test = "3.1"
 
 # ──────────────────────────────────────────────────────────────
 # FEATURES — security-critical settings are forced on
