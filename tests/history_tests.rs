@@ -1,9 +1,12 @@
 // tests/history_tests.rs
 //! Tests for the new key-history feature
 
+use encrypted_file_vault::add_file;
 use encrypted_file_vault::aliases::FilePassword;
 use encrypted_file_vault::core::*;
 use encrypted_file_vault::vault_db_conn;
+use encrypted_file_vault::vault_db_ops::rotate_key_in_vault;
+use encrypted_file_vault::vault_db_ops::store_key_blob;
 use rusqlite::params;
 use std::fs;
 use tempfile::tempdir;
