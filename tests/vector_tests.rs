@@ -46,7 +46,7 @@ impl Write for ThreadSafeVec {
 #[derive(Debug, Deserialize, Serialize)]
 struct TestVector {
     plaintext: String,
-    ciphertext_hex: String,
+    ciphertext: String,
 }
 
 #[test]
@@ -96,7 +96,7 @@ fn _run_vector_test(mode: DbMode) {
         let vectors: Vec<TestVector> = serde_json::from_str(&content).expect("parse vectors");
 
         for (idx, vec) in vectors.iter().enumerate() {
-            let ciphertext = hex::decode(&vec.ciphertext_hex).unwrap();
+            let ciphertext = hex::decode(&vec.ciphertext).unwrap();
 
             // Legacy → v3 upgrade path
             let v3_data = if version != "v3" {
