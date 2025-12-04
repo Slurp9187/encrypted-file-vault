@@ -1,12 +1,12 @@
-// src/core/crypto/legacy.rs
-use crate::aliases::{FileKey32, FilePassword, SecureConversionsExt, SecureRandomExt};
+// src/crypto/legacy.rs
+use crate::aliases::{
+    FileKey32, FilePassword, RandomFileKey32, SecureConversionsExt, SecureRandomExt,
+};
 use crate::consts::{AESCRYPT_V3_HEADER, RANDOM_KEY_KDF_ITERATIONS};
 use crate::error::CoreError;
-use aescrypt_rs::convert::convert_to_v3;
+use aescrypt_rs::convert::convert_to_v3_ext;
 use std::io::{Cursor, Write};
 use std::sync::{Arc, Mutex};
-
-use super::encrypt::encrypt_to_vec;
 
 pub type Result<T> = std::result::Result<T, CoreError>;
 
@@ -34,10 +34,11 @@ pub fn ensure_v3(ciphertext: Vec<u8>, password: &FilePassword) -> Result<Vec<u8>
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer = ThreadSafeVec(buffer.clone());
 
-    convert_to_v3(
+    convert_to_v3_ext(
         Cursor::new(ciphertext),
         writer,
         password,
+        Some(password),
         RANDOM_KEY_KDF_ITERATIONS,
     )
     .map_err(CoreError::Crypto)?;
@@ -51,22 +52,23 @@ pub fn upgrade_from_legacy(
     ciphertext: Vec<u8>,
     legacy_password: &FilePassword,
 ) -> Result<(Vec<u8>, FileKey32)> {
-    let new_key = FileKey32::random();
-    let new_password = FilePassword::new(new_key.expose_secret().to_hex());
+    let random_key = RandomFileKey32::new();
+    let new_password = FilePassword::new(random_key.expose_secret().to_hex());
+    let new_key = FileKey32::new(**random_key);
 
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer = ThreadSafeVec(buffer.clone());
 
-    convert_to_v3(
+    convert_to_v3_ext(
         Cursor::new(ciphertext),
         writer,
         legacy_password,
+        Some(&new_password),
         RANDOM_KEY_KDF_ITERATIONS,
     )
     .map_err(CoreError::Crypto)?;
 
-    let plaintext = std::mem::take(&mut *buffer.lock().unwrap());
+    let final_ct = std::mem::take(&mut *buffer.lock().unwrap());
 
-    let final_ct = encrypt_to_vec(&plaintext, &new_password)?;
     Ok((final_ct, new_key))
 }

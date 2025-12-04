@@ -1,9 +1,10 @@
+// tests/common.rs
 //! tests/common.rs
 //! Central test utilities — shared across all test modules
 
 #![allow(dead_code)]
 
-use encrypted_file_vault::aliases::{FileKey32, SecureRandomExt};
+use encrypted_file_vault::aliases::{FileKey32, RandomFileKey32, SecureRandomExt};
 use encrypted_file_vault::vault_db_ops::store_key_blob;
 use encrypted_file_vault::{index_db_conn::open_index_db, vault_db_conn::open_vault_db};
 use rusqlite::{params, Connection};
@@ -80,7 +81,7 @@ impl TestDbPair {
         display_name: &str,
         plaintext_size: i64,
     ) -> (String, FileKey32) {
-        let key = FileKey32::random();
+        let key = FileKey32::new(*RandomFileKey32::new().expose_secret());
         let file_id = blake3::hash(key.expose_secret()).to_hex().to_string();
 
         store_key_blob(&mut self.vault, &file_id, &key).expect("store key blob");

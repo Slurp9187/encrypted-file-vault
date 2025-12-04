@@ -3,12 +3,14 @@ mod common;
 use common::{DbMode, TestDbPair};
 
 // use aescrypt_rs::aliases::Password as AesCryptPassword; // only allowed here for legacy vectors
-use aescrypt_rs::convert::convert_to_v3;
+use aescrypt_rs::convert::convert_to_v3_ext;
 use aescrypt_rs::{decrypt, encrypt};
 use blake3::Hasher;
 use chrono::Utc;
 use encrypted_file_vault::aliases::FilePassword;
-use encrypted_file_vault::aliases::{FileKey32, SecureConversionsExt, SecureRandomExt};
+use encrypted_file_vault::aliases::{
+    FileKey32, RandomFileKey32, SecureConversionsExt, SecureRandomExt,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::fs;
@@ -104,13 +106,14 @@ fn _run_vector_test(mode: DbMode) {
                 {
                     let writer = ThreadSafeVec(buffer.clone());
                     let legacy_password = FilePassword::new(legacy_password_str.clone());
-                    convert_to_v3(
-                        Cursor::new(&ciphertext),
+                    convert_to_v3_ext(
+                        Cursor::new(ciphertext),
                         writer,
                         &legacy_password,
+                        Some(&legacy_password),
                         iterations,
                     )
-                    .expect("convert_to_v3 failed");
+                    .expect("convert_to_v3_ext failed");
                 }
                 Arc::try_unwrap(buffer)
                     .expect("buffer still has references")
@@ -133,7 +136,7 @@ fn _run_vector_test(mode: DbMode) {
             assert_eq!(decrypted, vec.plaintext.as_bytes());
 
             // Modern workflow: use random FileKey32
-            let new_key = FileKey32::random();
+            let new_key = FileKey32::new(*RandomFileKey32::new().expose_secret());
             let new_password = FilePassword::new(new_key.expose_secret().to_hex());
 
             let out_file = output_dir.join(format!("{version}_test_{idx:02}.txt.aes"));
