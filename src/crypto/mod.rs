@@ -1,4 +1,3 @@
-// src/core/crypto/mod.rs
 //! Pure cryptographic operations — no I/O, no database
 //!
 //! All functions work exclusively on in-memory buffers.
@@ -6,9 +5,10 @@
 mod decrypt;
 mod encrypt;
 mod legacy;
-mod rotate;
+mod rotate; // ← private, correct
 
 pub use decrypt::decrypt_to_vec;
 pub use encrypt::encrypt_to_vec;
-pub use legacy::{ensure_v3, upgrade_from_legacy};
-pub use rotate::rotate_key;
+pub use legacy::upgrade_from_legacy;
+pub use rotate::rotate_key; // ← in-memory version (small files)
+pub use rotate::rotate_key_streaming; // ← streaming version (production)
