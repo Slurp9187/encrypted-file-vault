@@ -58,7 +58,7 @@ pub fn upgrade_from_legacy(
 
     // Don't forget to clean up the leak!
     unsafe {
-        Box::from_raw(leaked.as_ptr() as *mut Vec<u8>);
+        let _ = Box::from_raw(leaked.as_ptr() as *mut Vec<u8>);
     }
 
     Ok((final_ct, new_key))
