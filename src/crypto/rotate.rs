@@ -1,17 +1,15 @@
-use secure_gate::SecureRandomExt;
-
 // src/crypto/rotate.rs
 use crate::aliases::{CypherText, FileKey32, FilePassword, PlainText, RandomFileKey32};
 use crate::error::CoreError;
+use secure_gate::SecureRandomExt;
 
 use super::{decrypt_to_vec, encrypt_to_vec, legacy::upgrade_from_legacy};
 
-pub type Result<T> = std::result::Result<T, CoreError>;
-
+/// Pure in-memory key rotation: old password → new random key
 pub fn rotate_key(
     ciphertext: &CypherText,
     old_password: &FilePassword,
-) -> Result<(CypherText, FileKey32)> {
+) -> Result<(CypherText, FileKey32), CoreError> {
     let (new_ciphertext, new_key) = if ciphertext.expose_secret().starts_with(b"AES\x03") {
         let plaintext: PlainText = decrypt_to_vec(ciphertext, old_password)?;
         let new_password_hex = RandomFileKey32::random_hex();

@@ -9,8 +9,6 @@ use std::sync::{Arc, Mutex};
 
 use super::encrypt::encrypt_to_vec;
 
-pub type Result<T> = std::result::Result<T, CoreError>;
-
 #[derive(Clone)]
 struct ThreadSafeVec(Arc<Mutex<Vec<u8>>>);
 
@@ -28,18 +26,16 @@ impl Write for ThreadSafeVec {
 pub fn upgrade_from_legacy(
     ciphertext: CypherText,
     old_password: &FilePassword,
-) -> Result<(CypherText, FileKey32)> {
+) -> Result<(CypherText, FileKey32), CoreError> {
     let new_password_hex = RandomFileKey32::random_hex();
     let new_key_bytes = new_password_hex.to_bytes();
     let new_key_arr: [u8; 32] = new_key_bytes
         .try_into()
-        .expect("random_hex always yields 64 chars → 32 bytes");
+        .expect("RandomFileKey32::random_hex() always yields 64 chars → 32 bytes");
     let new_key = FileKey32::new(new_key_arr);
     let new_password = FilePassword::new(new_password_hex.expose_secret().clone());
 
-    // Extract Box<Vec<u8>> and leak it to make it 'static
     let leaked: &'static [u8] = Box::leak(ciphertext.into_inner()).as_slice();
-
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer = ThreadSafeVec(buffer.clone());
 
@@ -56,7 +52,6 @@ pub fn upgrade_from_legacy(
     let plaintext = PlainText::new(plaintext_vec);
     let final_ct = encrypt_to_vec(&plaintext, &new_password)?;
 
-    // Don't forget to clean up the leak!
     unsafe {
         let _ = Box::from_raw(leaked.as_ptr() as *mut Vec<u8>);
     }
