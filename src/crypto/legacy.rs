@@ -1,16 +1,17 @@
 // src/crypto/legacy.rs
-use crate::aliases::{
-    FileKey32, FilePassword, RandomFileKey32, SecureConversionsExt, SecureRandomExt,
-};
-use crate::consts::{AESCRYPT_V3_HEADER, RANDOM_KEY_KDF_ITERATIONS};
+use crate::aliases::{CypherText, FileKey32, FilePassword, RandomFileKey32};
+use crate::consts::RANDOM_KEY_KDF_ITERATIONS;
 use crate::error::CoreError;
 use aescrypt_rs::convert::convert_to_v3_ext;
+use secure_gate::SecureRandomExt;
 use std::io::{Cursor, Write};
 use std::sync::{Arc, Mutex};
 
+use super::encrypt::encrypt_to_vec;
+
 pub type Result<T> = std::result::Result<T, CoreError>;
 
-/// Thread-safe writer for convert_to_v3 (required due to 'static bound on W)
+/// Thread-safe writer required because convert_to_v3_ext demands a 'static writer
 #[derive(Clone)]
 struct ThreadSafeVec(Arc<Mutex<Vec<u8>>>);
 
@@ -19,56 +20,57 @@ impl Write for ThreadSafeVec {
         self.0.lock().unwrap().extend_from_slice(buf);
         Ok(buf.len())
     }
-
     fn flush(&mut self) -> std::io::Result<()> {
         Ok(())
     }
 }
 
-/// Upgrade legacy v0-v2 → v3 if needed, otherwise pass through
-pub fn ensure_v3(ciphertext: Vec<u8>, password: &FilePassword) -> Result<Vec<u8>> {
-    if ciphertext.get(..5) == Some(AESCRYPT_V3_HEADER.as_slice()) {
-        return Ok(ciphertext);
-    }
-
-    let buffer = Arc::new(Mutex::new(Vec::new()));
-    let writer = ThreadSafeVec(buffer.clone());
-
-    convert_to_v3_ext(
-        Cursor::new(ciphertext),
-        writer,
-        password,
-        Some(password),
-        RANDOM_KEY_KDF_ITERATIONS,
-    )
-    .map_err(CoreError::Crypto)?;
-
-    let result = std::mem::take(&mut *buffer.lock().unwrap());
-    Ok(result)
-}
-
-/// One-time migration: legacy file → v3 with fresh random key
+/// One-time migration: legacy v0-v2 file → v3 with a fresh random key
+///
+/// * `ciphertext`      – original legacy AES-Crypt file (v0-v2)
+/// * `old_password`    – password that can decrypt the legacy file
+///
+/// Returns the new v3 ciphertext (wrapped in our `CypherText` alias) and the
+/// freshly-generated random file key (as `FileKey32`).
 pub fn upgrade_from_legacy(
     ciphertext: Vec<u8>,
-    legacy_password: &FilePassword,
-) -> Result<(Vec<u8>, FileKey32)> {
-    let random_key = RandomFileKey32::new();
-    let new_password = FilePassword::new(random_key.expose_secret().to_hex());
-    let new_key = FileKey32::new(**random_key);
+    old_password: &FilePassword,
+) -> Result<(CypherText, FileKey32)> {
+    // 1. Fresh random 256-bit key – hex form (zeroized on drop)
+    let new_password_hex = RandomFileKey32::random_hex();
 
+    // 2. Decode the validated hex back to bytes (guaranteed 32 bytes)
+    let new_key_bytes = new_password_hex.to_bytes();
+
+    // 3. Convert Vec<u8> to [u8; 32] – always succeeds (validated length)
+    let new_key_arr: [u8; 32] = new_key_bytes
+        .try_into()
+        .expect("Generated random hex is always 32 bytes");
+
+    // 4. Canonical fixed-size secret for the vault DB
+    let new_key = FileKey32::new(new_key_arr);
+
+    // 5. Dynamic password wrapper expected by aescrypt-rs (clone the inner String)
+    let new_password = FilePassword::new(new_password_hex.expose_secret().clone());
+
+    // 6. Decrypt legacy file → plaintext (via thread-safe writer)
     let buffer = Arc::new(Mutex::new(Vec::new()));
     let writer = ThreadSafeVec(buffer.clone());
 
     convert_to_v3_ext(
         Cursor::new(ciphertext),
         writer,
-        legacy_password,
-        Some(&new_password),
+        old_password,        // ← matches the upstream param name
+        Some(&new_password), // new random key (optional in ext version)
         RANDOM_KEY_KDF_ITERATIONS,
     )
     .map_err(CoreError::Crypto)?;
 
-    let final_ct = std::mem::take(&mut *buffer.lock().unwrap());
+    // 7. Grab the plaintext
+    let plaintext = std::mem::take(&mut *buffer.lock().unwrap());
 
-    Ok((final_ct, new_key))
+    // 8. Re-encrypt with the brand-new random key
+    let final_ct = encrypt_to_vec(&plaintext, &new_password)?;
+
+    Ok((CypherText::new(final_ct), new_key))
 }

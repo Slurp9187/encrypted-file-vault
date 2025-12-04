@@ -10,5 +10,5 @@ mod rotate;
 
 pub use decrypt::decrypt_to_vec;
 pub use encrypt::encrypt_to_vec;
-pub use legacy::{ensure_v3, upgrade_from_legacy};
+pub use legacy::upgrade_from_legacy;
 pub use rotate::rotate_key;
