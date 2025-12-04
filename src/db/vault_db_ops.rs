@@ -42,11 +42,16 @@ pub fn rotate_key_in_vault<P: AsRef<Path>>(
     old_password: &FilePassword,
     note: Option<&str>,
 ) -> Result<Key> {
-    let ciphertext = CypherText::new(std::fs::read(encrypted_path.as_ref())?);
-    let (new_ciphertext, new_key) = rotate_key(&ciphertext, old_password)?;
+    let path = encrypted_path.as_ref();
+    let temp_path = path.with_extension("tmp-rotate");
 
-    // Write using expose_secret() — no AsRef needed
-    std::fs::write(encrypted_path.as_ref(), new_ciphertext.expose_secret())?;
+    let new_key = {
+        let input = std::fs::File::open(path)?;
+        let output = std::fs::File::create(&temp_path)?;
+        rotate_key_streaming(input, output, old_password)?
+    };
+
+    std::fs::rename(&temp_path, path)?;
 
     let tx = vault_conn.transaction().map_err(CoreError::Sql)?;
     let current_version: i64 = tx.query_row(
