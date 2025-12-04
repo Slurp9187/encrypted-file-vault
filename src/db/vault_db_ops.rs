@@ -2,16 +2,16 @@
 
 use std::path::Path;
 
-use crate::aliases::{CypherText, FilePassword, PlainText};
+use crate::aliases::{FilePassword, PlainText};
 use crate::consts::{DEFAULT_FILENAME_STYLE, DEFAULT_ID_LENGTH_HEX};
-use crate::crypto::rotate_key;
+use crate::crypto::rotate_key_streaming;
 use crate::db::index_db_ops::{store_file_entry, FileEntry};
 use crate::error::CoreError;
 use crate::file_ops::encrypt_file;
 use crate::key_ops::{generate_key, Key};
 use crate::util::blake3_hex;
 use rusqlite::{params, Connection};
-use secure_gate::SecureConversionsExt;
+use secure_gate::SecureConversionsExt; // ← FIXED: needed for .to_hex()
 
 use crate::Result;
 
